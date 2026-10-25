@@ -1,0 +1,18 @@
+{
+  "short_name": "GreyWater Guardian",
+  "name": "GreyWater Guardian — Adaptive Greywater Quality Detection & Filtration",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512 192x192 any",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#090d16",
+  "theme_color": "#0ea5e9",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "description": "Adaptive water-quality monitoring, deterministic rules assessment, and multi-stage greywater filtration control PWA."
+}
