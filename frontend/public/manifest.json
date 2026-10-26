@@ -3,13 +3,14 @@
   "name": "GreyWater Guardian — Adaptive Greywater Quality Detection & Filtration",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "icon.svg",
       "type": "image/svg+xml",
       "sizes": "512x512 192x192 any",
       "purpose": "any maskable"
     }
   ],
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "background_color": "#090d16",
   "theme_color": "#0ea5e9",
   "display": "standalone",
