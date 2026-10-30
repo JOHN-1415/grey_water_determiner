@@ -7,6 +7,12 @@ import { authenticateDevice } from '../middleware/auth.js';
 import * as telemetryCtrl from '../controllers/telemetryController.js';
 import { listScenarios, getScenario } from '../services/demoService.js';
 import * as db from '../database/db.js';
+import {
+  getSerialStatus,
+  listAvailablePorts,
+  startSerialCollector,
+  stopSerialCollector
+} from '../services/serialCollector.js';
 
 const router = express.Router();
 
@@ -55,12 +61,48 @@ router.post('/demo/trigger/:scenarioId', async (req, res) => {
   }
 });
 
-// 5. System Health & Database Mode
+// 5. USB Serial Collector Endpoints
+router.get('/serial/status', (req, res) => {
+  res.json({
+    status: 'SUCCESS',
+    data: getSerialStatus()
+  });
+});
+
+router.get('/serial/ports', async (req, res) => {
+  const ports = await listAvailablePorts();
+  res.json({
+    status: 'SUCCESS',
+    data: ports
+  });
+});
+
+router.post('/serial/connect', async (req, res) => {
+  const { port, baud } = req.body;
+  await startSerialCollector({ port, baud });
+  res.json({
+    status: 'SUCCESS',
+    message: `Attempting connection to ${port || 'auto-detected port'}`,
+    data: getSerialStatus()
+  });
+});
+
+router.post('/serial/disconnect', async (req, res) => {
+  await stopSerialCollector();
+  res.json({
+    status: 'SUCCESS',
+    message: 'Serial port disconnected',
+    data: getSerialStatus()
+  });
+});
+
+// 6. System Health & Database Mode
 router.get('/health', (req, res) => {
   res.json({
     status: 'HEALTHY',
     service: 'GreyWater Guardian API',
     database_mode: db.getDbMode(),
+    serial_status: getSerialStatus(),
     timestamp: new Date().toISOString()
   });
 });

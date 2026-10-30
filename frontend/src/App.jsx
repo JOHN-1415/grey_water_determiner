@@ -20,6 +20,7 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [events, setEvents] = useState([]);
   const [rulesConfig, setRulesConfig] = useState(null);
+  const [serialStatus, setSerialStatus] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(3000);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -29,12 +30,13 @@ export default function App() {
   const refreshData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [reading, status, hist, evs, config] = await Promise.all([
+      const [reading, status, hist, evs, config, serial] = await Promise.all([
         dataProvider.fetchLatestReading('GW-001', mode, activeScenarioId),
         dataProvider.fetchDeviceStatus('GW-001', mode, activeScenarioId),
         dataProvider.fetchHistory('GW-001', mode, 50),
         dataProvider.fetchSystemEvents('GW-001', mode),
-        dataProvider.getRulesConfig()
+        dataProvider.getRulesConfig(),
+        dataProvider.fetchSerialStatus()
       ]);
 
       setLatestReading(reading);
@@ -42,6 +44,7 @@ export default function App() {
       setHistory(hist);
       setEvents(evs);
       setRulesConfig(config);
+      setSerialStatus(serial);
     } catch (err) {
       console.error('[App] Failed to refresh telemetry:', err);
     } finally {
@@ -80,6 +83,7 @@ export default function App() {
         mode={mode}
         setMode={setMode}
         deviceStatus={deviceStatus}
+        serialStatus={serialStatus}
         latestReading={latestReading}
         pollingInterval={pollingInterval}
         isRefreshing={isRefreshing}

@@ -9,6 +9,7 @@ import apiRoutes from './routes/api.js';
 import { initDatabase, getDbMode } from './database/db.js';
 import { getScenario } from './services/demoService.js';
 import * as telemetryCtrl from './controllers/telemetryController.js';
+import { startSerialCollector } from './services/serialCollector.js';
 
 dotenv.config();
 
@@ -68,6 +69,15 @@ export async function startServer() {
     console.log(`REST API: http://localhost:${PORT}/api/v1`);
     console.log(`====================================================`);
   });
+
+  // Launch background USB Serial Collector if enabled
+  if (process.env.SERIAL_AUTO_START !== 'false') {
+    try {
+      await startSerialCollector();
+    } catch (err) {
+      console.warn('[Bootstrap] Serial collector auto-start notice:', err.message);
+    }
+  }
 
   return server;
 }

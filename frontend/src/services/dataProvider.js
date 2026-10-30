@@ -289,6 +289,22 @@ class DataProviderService {
   }
 
   /**
+   * Fetch USB Serial Connection Status
+   */
+  async fetchSerialStatus() {
+    try {
+      const res = await fetch(`${API_BASE}/serial/status`);
+      if (res.ok) {
+        const json = await res.json();
+        return json.data;
+      }
+    } catch {
+      // Backend or serial unavailable
+    }
+    return null;
+  }
+
+  /**
    * Fetch System Events Log
    */
   async fetchSystemEvents(deviceId = 'GW-001', mode = 'SIMULATED') {

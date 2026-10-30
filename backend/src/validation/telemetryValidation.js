@@ -13,7 +13,7 @@ export const SENSOR_PLAUSIBILITY_LIMITS = {
   ph: { min: 0.0, max: 14.0, unit: 'pH', optional: true },
   tds_ppm: { min: 0.0, max: 5000.0, unit: 'ppm', optional: false },
   turbidity_ntu: { min: 0.0, max: 2000.0, unit: 'NTU', optional: false },
-  temperature_c: { min: 0.0, max: 80.0, unit: '°C', optional: false }
+  temperature_c: { min: -10.0, max: 85.0, unit: '°C', optional: true }
 };
 
 /**
@@ -78,17 +78,27 @@ export function validateTelemetryPayload(payload) {
     errors.push("'uptime_seconds' must be a non-negative number");
   }
 
-  // sensors object validation
-  if (!payload.sensors || typeof payload.sensors !== 'object') {
-    errors.push("Missing or invalid 'sensors' object");
-    return { isValid: false, errors, data: null };
+  // Extract sensors from either nested payload.sensors or flat root fields
+  let rawSensors = payload.sensors;
+  if (!rawSensors || typeof rawSensors !== 'object') {
+    if (payload.tds_ppm !== undefined || payload.turbidity_ntu !== undefined || payload.temperature_c !== undefined) {
+      rawSensors = {
+        ph: payload.ph !== undefined ? payload.ph : null,
+        tds_ppm: payload.tds_ppm,
+        turbidity_ntu: payload.turbidity_ntu,
+        temperature_c: payload.temperature_c !== undefined ? payload.temperature_c : null
+      };
+    } else {
+      errors.push("Missing or invalid 'sensors' object (or sensor measurements)");
+      return { isValid: false, errors, data: null };
+    }
   }
 
   const validatedSensors = {};
   const sensorValidationErrors = [];
 
   for (const [key, limit] of Object.entries(SENSOR_PLAUSIBILITY_LIMITS)) {
-    const res = validateSensorValue(key, payload.sensors[key], limit);
+    const res = validateSensorValue(key, rawSensors[key], limit);
     if (!res.valid) {
       sensorValidationErrors.push(res.error);
     } else {
@@ -116,18 +126,19 @@ export function validateTelemetryPayload(payload) {
     }
   }
 
-  // Treatment state validation
-  let validatedTreatment = null;
-  if (payload.treatment && typeof payload.treatment === 'object') {
-    const activeStage = payload.treatment.active_stage;
-    validatedTreatment = {
-      active_stage: (activeStage === null || activeStage === undefined) ? null : Number(activeStage),
-      stage_1: payload.treatment.stage_1 || 'UNKNOWN',
-      stage_2: payload.treatment.stage_2 || 'UNKNOWN',
-      stage_3: payload.treatment.stage_3 || 'UNKNOWN',
-      pump_status: payload.treatment.pump_status || 'UNKNOWN'
-    };
-  }
+  // Treatment state validation (Prototype has only Stage 1 physical filtration)
+  const pumpStatus = payload.pump_status || payload.treatment?.pump_status || 'UNKNOWN';
+  const activeStage = payload.treatment?.active_stage !== undefined
+    ? payload.treatment.active_stage
+    : (pumpStatus === 'ON' ? 1 : 0);
+
+  const validatedTreatment = {
+    active_stage: (activeStage === null || activeStage === undefined) ? null : Number(activeStage),
+    stage_1: payload.treatment?.stage_1 || (pumpStatus === 'ON' ? 'ACTIVE' : 'IDLE'),
+    stage_2: 'NOT_INSTALLED', // Physical prototype does not implement Stage 2
+    stage_3: 'NOT_INSTALLED', // Physical prototype does not implement Stage 3
+    pump_status: pumpStatus
+  };
 
   const isValid = errors.length === 0;
 
@@ -143,6 +154,7 @@ export function validateTelemetryPayload(payload) {
           device_status: payload.device_status || 'ONLINE',
           treatment: validatedTreatment,
           output_sensors: validatedOutputSensors,
+          classification: payload.classification || null,
           source_mode: payload.source_mode || 'HARDWARE'
         }
       : null

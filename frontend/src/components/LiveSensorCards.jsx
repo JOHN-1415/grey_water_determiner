@@ -127,13 +127,16 @@ export default function LiveSensorCards({ sensors, assessment, isStale }) {
               TEMPERATURE
             </span>
           </div>
-          <span className="badge" style={{ background: 'rgba(148, 163, 184, 0.15)', color: '#cbd5e1' }}>
-            DS18B20 Digital
+          <span className="badge" style={{
+            background: temp === null || temp === undefined ? 'rgba(239, 68, 68, 0.18)' : 'rgba(16, 185, 129, 0.15)',
+            color: temp === null || temp === undefined ? '#f87171' : '#cbd5e1'
+          }}>
+            {temp === null || temp === undefined ? 'DISCONNECTED' : 'DS18B20 (GPIO 4)'}
           </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', margin: '10px 0' }}>
-          <span className="sensor-value" style={{ color: temp > 50 ? '#ef4444' : temp > 35 ? '#f59e0b' : '#34d399' }}>
+          <span className="sensor-value" style={{ color: temp === null || temp === undefined ? '#94a3b8' : temp > 50 ? '#ef4444' : temp > 35 ? '#f59e0b' : '#34d399' }}>
             {temp !== null && temp !== undefined && Number.isFinite(Number(temp)) ? Number(temp).toFixed(1) : '--'}
           </span>
           <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
@@ -145,14 +148,14 @@ export default function LiveSensorCards({ sensors, assessment, isStale }) {
         <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
           <div style={{
             height: '100%',
-            width: `${Math.min(100, Math.max(0, (Number(temp) || 0) * 1.6))}%`,
+            width: temp !== null && temp !== undefined ? `${Math.min(100, Math.max(0, (Number(temp) || 0) * 1.6))}%` : '0%',
             background: temp > 45 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : 'linear-gradient(90deg, #06b6d4, #10b981)',
             transition: 'width 0.4s ease'
           }} />
         </div>
 
         <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', display: 'flex', justifyContent: 'space-between' }}>
-          <span>Nominal: 15–35°C</span>
+          <span>{temp === null || temp === undefined ? 'Reading Unavailable' : 'Nominal: 15–35°C'}</span>
           <span>Scald Limit: &gt;50°C</span>
         </div>
       </div>

@@ -199,28 +199,60 @@ void loop() {
                 <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>Photodiode transmission voltage</td>
               </tr>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                <td style={{ padding: '6px 8px', fontWeight: '600' }}>Relay Module (Pump/Valves)</td>
-                <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>GPIO 25, 26</td>
-                <td style={{ padding: '6px 8px' }}><span className="badge level-basic">CONFIRMED</span></td>
-                <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>Switches 12V submersible pump and solenoids</td>
+                <td style={{ padding: '6px 8px', fontWeight: '600' }}>Pump Relay (Stage 1)</td>
+                <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>GPIO 25</td>
+                <td style={{ padding: '6px 8px' }}><span className="badge level-basic">CONFIRMED (ONLY STAGE)</span></td>
+                <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>Powers physical pump for sediment filtration (Active-LOW)</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <td style={{ padding: '6px 8px', fontWeight: '600' }}>Stage 2 Activated Carbon</td>
+                <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>None</td>
+                <td style={{ padding: '6px 8px' }}><span className="badge level-unknown">NOT PHYSICALLY INSTALLED</span></td>
+                <td style={{ padding: '6px 8px', color: '#fbbf24' }}>Software classification only; no physical stage installed</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <td style={{ padding: '6px 8px', fontWeight: '600' }}>Stage 3 Fine Filtration</td>
+                <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>None</td>
+                <td style={{ padding: '6px 8px' }}><span className="badge level-unknown">NOT PHYSICALLY INSTALLED</span></td>
+                <td style={{ padding: '6px 8px', color: '#fbbf24' }}>Software classification only; no physical stage installed</td>
               </tr>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                 <td style={{ padding: '6px 8px', fontWeight: '600' }}>pH Sensor Probe</td>
                 <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>N/A (Crossed Out)</td>
-                <td style={{ padding: '6px 8px' }}><span className="badge level-unknown">OPTIONAL / PENDING</span></td>
-                <td style={{ padding: '6px 8px', color: '#fbbf24' }}>Explicitly marked optional in code; probe crossed out on diagram</td>
-              </tr>
-              <tr>
-                <td style={{ padding: '6px 8px', fontWeight: '600' }}>Stage 3 Microfiltration</td>
-                <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>GPIO 27</td>
-                <td style={{ padding: '6px 8px' }}><span className="badge level-unknown">PENDING SHOP CONFIRM</span></td>
-                <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>External project shop awaiting module stock</td>
+                <td style={{ padding: '6px 8px' }}><span className="badge level-unknown">OPTIONAL / OMITTED</span></td>
+                <td style={{ padding: '6px 8px', color: '#94a3b8' }}>Explicitly marked optional in code; probe crossed out on diagram</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        {/* 2. Sample cURL Test Command */}
+        {/* 2. Node.js USB Serial Collector */}
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Terminal size={16} color="#38bdf8" />
+              Start USB Serial Collector (Auto-Detects ESP32 COM Port)
+            </span>
+          </div>
+          <pre style={{
+            background: '#090d16',
+            padding: '12px',
+            borderRadius: '8px',
+            fontSize: '0.75rem',
+            fontFamily: 'var(--font-mono)',
+            color: '#34d399',
+            overflowX: 'auto',
+            border: '1px solid var(--border-subtle)',
+            marginBottom: '6px'
+          }}>
+            npm --prefix backend run serial
+          </pre>
+          <div style={{ fontSize: '0.725rem', color: 'var(--text-subtle)' }}>
+            Automatically detects Silicon Labs CP210x / CH340 / ESP32 COM ports at 115200 baud, reads newline-delimited JSON, and streams data live to the dashboard.
+          </div>
+        </div>
+
+        {/* 3. Sample cURL Test Command */}
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>

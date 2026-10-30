@@ -193,10 +193,18 @@ export function assessWaterQuality(sensors, customConfig = null, metadata = {}) 
     }
   }
 
-  // Temperature (DS18B20)
+  // Temperature (DS18B20 Digital Sensor)
   const temp = sensors.temperature_c;
-  if (temp === null || temp === undefined || !Number.isFinite(Number(temp)) || Number(temp) < -10 || Number(temp) > 85) {
-    sensorErrors.push(`Required Temperature sensor reading is missing or implausible: ${temp}`);
+  if (temp === null || temp === undefined) {
+    parameterDetails.temperature_c = {
+      value: null,
+      unit: '°C',
+      status: 'UNAVAILABLE_DISCONNECTED',
+      required_level: 'BASIC',
+      reason: 'DS18B20 temperature probe reading unavailable or probe disconnected'
+    };
+  } else if (!Number.isFinite(Number(temp)) || Number(temp) < -10 || Number(temp) > 85) {
+    sensorErrors.push(`Temperature sensor reading is implausible: ${temp}`);
   } else {
     const val = Number(temp);
     parametersConsidered.push('temperature_c');

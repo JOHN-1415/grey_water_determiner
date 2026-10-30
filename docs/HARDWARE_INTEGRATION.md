@@ -22,42 +22,52 @@ The system uses an **ESP32 microcontroller** as the primary IoT edge controller,
   | (OneWire)      |     Controller      |   (Analog ADC) |
   v                +----------+----------+                v
 +---------------+             |                     +------------+
-|    DS18B20    |             | (GPIO 25, 26)       | TDS Sensor |
+|    DS18B20    |             | (GPIO 25 Only)      | TDS Sensor |
 |  Temp Sensor  |             v                     +------------+
 +---------------+      +--------------+                   ^
-                       | Relay Module |                   | (Analog ADC)
+                       | Pump Relay   |                   | (Analog ADC)
                        +-------+------+             +------------+
                                |                    | Turbidity  |
                                v                    |   Sensor   |
                        +--------------+             +------------+
-                       | Pump & Valve |                   x
-                       |  Actuation   |         [pH Sensor Omitted]
+                       | Submersible  |                   x
+                       |  Pump (Stg 1)|         [pH Sensor Omitted]
                        +--------------+         (Crossed Out on Diagram)
 ```
 
-### Pin Allocation Table
+### Verified Pin Allocation Table
 
-| Component | Pin / Channel | ESP32 GPIO | Operating Voltage | Interface Type |
-|---|---|---|---|---|
-| **DS18B20** Temperature | DQ Data Pin | **GPIO 4** | 3.3V / 5.0V | 1-Wire Digital (requires 4.7kΩ pull-up to 3.3V) |
-| **Analog TDS Sensor** | Signal Out | **GPIO 34** | 3.3V – 5.0V | ADC1 Channel 6 (0–3.3V analog input) |
-| **Turbidity Sensor** | Signal Out (AOUT) | **GPIO 35** | 5.0V supply | ADC1 Channel 7 (0–3.3V analog input) |
-| **Pump Relay** | IN1 (Active Low) | **GPIO 25** | 5.0V VCC / 3.3V logic | Digital Output |
-| **Stage 2 Valve Relay** | IN2 (Active Low) | **GPIO 26** | 5.0V VCC / 3.3V logic | Digital Output |
-| **Stage 3 Valve Relay** | IN3 (Provisional) | **GPIO 27** | 5.0V VCC / 3.3V logic | Digital Output (Optional) |
-| **pH Sensor** | Signal Out | *Unassigned* | *N/A* | **Optional / Crossed Out on Diagram** |
+| Component | Pin / Channel | ESP32 GPIO | Operating Voltage | Interface Type | Physical Status |
+|---|---|---|---|---|---|
+| **DS18B20** Temperature | DQ Data Pin | **GPIO 4** | 3.3V / 5.0V | 1-Wire Digital (requires 4.7kΩ pull-up to 3.3V) | **INSTALLED** |
+| **Analog TDS Sensor** | Signal Out | **GPIO 34** | 3.3V – 5.0V | ADC1 Channel 6 (0–3.3V analog input) | **INSTALLED** |
+| **Turbidity Sensor** | Signal Out (AOUT) | **GPIO 35** | 5.0V supply | ADC1 Channel 7 (0–3.3V analog input) | **INSTALLED** |
+| **Pump Relay** | IN1 (Active Low) | **GPIO 25** | 5.0V VCC / 3.3V logic | Digital Output | **INSTALLED (Stage 1 Only)** |
+| **Stage 2 Valve Relay** | None | *None* | *None* | Software classification only | **NOT INSTALLED** |
+| **Stage 3 Valve Relay** | None | *None* | *None* | Software classification only | **NOT INSTALLED** |
+| **pH Sensor** | Signal Out | *Unassigned* | *N/A* | Optional / Null | **OMITTED** |
+
+> **IMPORTANT ARCHITECTURAL REALITY:**  
+> The physical prototype implements **only ONE basic physical filtration stage** (Stage 1, pump driven by GPIO 25).  
+> Medium and High are **software assessment classifications only** indicating whether the greywater quality exceeds basic capability. No physical Stage 2 or Stage 3 systems exist.
 
 ---
 
-## 2. Hardware Confirmation Checklist (Awaiting Project Shop)
+## 2. Telemetry Interfaces
 
-The software architecture is deliberately decouple-built to prevent blocking on hardware delivery:
+The system supports two complementary telemetry modes:
 
-| Component / Detail | Status | Software Implementation Strategy |
-|---|---|---|
-| **DS18B20 Temperature** | **CONFIRMED** | Fully implemented, parsed as degrees Celsius, bounds: 0–80°C. |
-| **Analog TDS Sensor** | **CONFIRMED** | Fully implemented with standard quadratic calibration curve (ppm). |
-| **Turbidity Sensor** | **CONFIRMED** | Fully implemented with transmission voltage conversion (NTU). |
+### Primary: USB Serial Telemetry (115200 baud)
+The ESP32 transmits newline-delimited JSON directly over USB Serial to the host computer:
+```json
+{"device_id":"GW-001","sequence":1,"temperature_c":27.5,"tds_ppm":420.0,"turbidity_ntu":12.4,"classification":"MEDIUM","pump_status":"ON","source_mode":"HARDWARE"}
+```
+- When the DS18B20 is disconnected, `"temperature_c":null` is emitted (never fabricated).
+- When sensor readings are invalid, `null` is emitted and classification evaluates to `"UNKNOWN"`.
+- Handled automatically by the Node.js Serial Collector: `npm --prefix backend run serial`.
+
+### Secondary: Wi-Fi REST Telemetry (Optional)
+Disabled by default (`ENABLE_WIFI = false`). Can be enabled in firmware if standalone wireless HTTP streaming to `POST /api/v1/telemetry` is desired.
 | **Relay Actuation** | **CONFIRMED** | Mapped to Stage 1, Stage 2, and Pump power status in telemetry. |
 | **pH Sensor Inclusion** | **PENDING / OPTIONAL** | Software treats `ph` as nullable (`null`). When omitted, assessment proceeds reliably without false alarms. |
 | **Stage 3 Fine Module** | **PENDING SHOP STOCK** | Marked provisional in pipeline visualizer; activates only when hardware reports status. |

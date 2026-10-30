@@ -90,6 +90,20 @@ export default function AssessmentRecommendationCard({ assessment }) {
             ))}
           </ul>
         )}
+
+        {(level === 'MEDIUM' || level === 'HIGH') && (
+          <div style={{
+            marginTop: '12px',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            background: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            fontSize: '0.825rem',
+            color: '#fef3c7'
+          }}>
+            <strong>Prototype Hardware Note:</strong> Assessed requirement ({level}) exceeds the current physical prototype, which contains <strong>only Stage 1 basic physical filtration</strong>. Stage 2 / Stage 3 modules are not physically present.
+          </div>
+        )}
       </div>
 
       {/* Metadata info: Parameters considered */}

@@ -5,6 +5,7 @@ export default function HeaderNav({
   mode,
   setMode,
   deviceStatus,
+  serialStatus,
   latestReading,
   pollingInterval,
   isRefreshing,
@@ -14,6 +15,7 @@ export default function HeaderNav({
 }) {
   const connectivity = deviceStatus?.connectivity || 'UNKNOWN';
   const isSimulated = mode === 'SIMULATED';
+  const lastTimeStr = latestReading?.received_at ? new Date(latestReading.received_at).toLocaleTimeString() : null;
 
   return (
     <header className="glass-panel" style={{ padding: '16px 24px', marginBottom: '20px' }}>
@@ -99,7 +101,39 @@ export default function HeaderNav({
                 #{latestReading.sequence}
               </span>
             )}
+            {lastTimeStr && (
+              <span style={{ color: 'var(--text-subtle)', fontSize: '0.75rem', borderLeft: '1px solid var(--border-subtle)', paddingLeft: '6px' }}>
+                {lastTimeStr}
+              </span>
+            )}
           </div>
+
+          {/* USB Serial Status Pill (When in Hardware mode or serial detected) */}
+          {(!isSimulated || serialStatus?.status === 'CONNECTED') && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              background: 'rgba(15, 23, 42, 0.8)',
+              border: `1px solid ${serialStatus?.status === 'CONNECTED' ? 'rgba(16, 185, 129, 0.4)' : 'var(--border-subtle)'}`,
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.775rem'
+            }}>
+              <span style={{ color: 'var(--text-muted)' }}>USB:</span>
+              <span style={{
+                color: serialStatus?.status === 'CONNECTED' ? '#34d399' : '#fbbf24',
+                fontWeight: '700'
+              }}>
+                {serialStatus?.status === 'CONNECTED'
+                  ? `${serialStatus.portPath || 'COM'} (Live)`
+                  : serialStatus?.status === 'RETRYING'
+                  ? 'Scanning...'
+                  : 'Disconnected'}
+              </span>
+            </div>
+          )}
 
           {/* Quick Actions */}
           <button
