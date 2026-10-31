@@ -98,6 +98,16 @@ export async function saveReading(reading) {
   const assignedClassification = reading.assessment?.treatment_level || reading.classification || 'UNKNOWN';
 
   if (isUsingFallback || !pool) {
+    // De-duplication check: if this sequence was already stored for this device, return existing record
+    if (reading.sequence !== undefined && reading.sequence !== null) {
+      const existing = inMemoryStore.readings.find(
+        (r) => r.device_id === reading.device_id && r.sequence === reading.sequence
+      );
+      if (existing) {
+        return existing;
+      }
+    }
+
     const record = {
       id: inMemoryStore.readings.length + 1,
       device_id: reading.device_id,

@@ -10,6 +10,7 @@ import { SerialPort } from 'serialport';
 import { ReadlineParser } from '@serialport/parser-readline';
 import { validateTelemetryPayload } from '../validation/telemetryValidation.js';
 import { assessWaterQuality, DEFAULT_RULES_CONFIG } from './rulesEngine.js';
+import { parseKiwiLine } from './kiwiParser.js';
 import * as db from '../database/db.js';
 
 // Status tracking state
@@ -219,14 +220,28 @@ async function connect(targetPort, baudRate) {
         return;
       }
 
-      // Parse JSON telemetry
+      // 1. Direct GreyWater Guardian JSON Telemetry
+      if (trimmed.startsWith('{') && trimmed.includes('"device_id"')) {
+        try {
+          const payload = JSON.parse(trimmed);
+          await processTelemetryRecord(payload);
+          return;
+        } catch (parseErr) {
+          state.errorCount++;
+          console.warn(`[SerialCollector] Malformed JSON received: ${trimmed.substring(0, 80)}`);
+          return;
+        }
+      }
+
+      // 2. KiwiIoT / Legacy Physical Firmware Stream
+      // Seamlessly captures live sensor values from pre-flashed ESP32 firmware
       try {
-        const payload = JSON.parse(trimmed);
-        await processTelemetryRecord(payload);
-      } catch (parseErr) {
-        state.errorCount++;
-        // Ignore partial/unrecognized non-JSON lines without crashing
-        console.warn(`[SerialCollector] Non-JSON or malformed data received: ${trimmed.substring(0, 80)}`);
+        const legacyPayload = parseKiwiLine(trimmed);
+        if (legacyPayload) {
+          await processTelemetryRecord(legacyPayload);
+        }
+      } catch (legacyErr) {
+        console.warn('[SerialCollector] Legacy stream parse error:', legacyErr.message);
       }
     });
 

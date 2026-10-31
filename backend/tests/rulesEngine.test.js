@@ -137,4 +137,30 @@ describe('Rules Engine — Water Quality Assessment & Recommendations', () => {
     assert.ok(limits.some((l) => /potability/i.test(l)));
     assert.ok(limits.some((l) => /does not physically purify/i.test(l)));
   });
+
+  test('10. Handles disconnected or invalid temperature without producing UNKNOWN classification', () => {
+    // DS18B20 disconnected (temperature_c is null)
+    const disconnectedTemp = {
+      ph: null,
+      tds_ppm: 220,
+      turbidity_ntu: 3.5,
+      temperature_c: null
+    };
+
+    const resNull = assessWaterQuality(disconnectedTemp);
+    assert.equal(resNull.treatment_level, 'LEVEL_1');
+    assert.equal(resNull.parameter_details.temperature_c.status, 'UNAVAILABLE_DISCONNECTED');
+
+    // DS18B20 reporting hardware anomaly (-127°C)
+    const faultTemp = {
+      ph: null,
+      tds_ppm: 220,
+      turbidity_ntu: 3.5,
+      temperature_c: -127.0
+    };
+
+    const resFault = assessWaterQuality(faultTemp);
+    assert.equal(resFault.treatment_level, 'LEVEL_1');
+    assert.equal(resFault.parameter_details.temperature_c.status, 'SENSOR_ANOMALY');
+  });
 });

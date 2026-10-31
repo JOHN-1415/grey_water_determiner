@@ -49,12 +49,24 @@ export async function postTelemetry(req, res) {
     const deviceId = data.device_id;
     const receivedAt = new Date();
 
-    // 2. Sequence integrity check
+    // 2. Duplicate detection & Sequence integrity check
+    // When ESP32 transmits concurrently over USB Serial and Wi-Fi, identical sequence packets arrive.
     const lastSeq = lastSequences.get(deviceId);
+    if (lastSeq !== undefined && data.sequence === lastSeq) {
+      // Suppress duplicate record persistence
+      return res.status(200).json({
+        status: 'SUCCESS',
+        message: 'Duplicate telemetry sequence suppressed (dual-channel Wi-Fi/Serial ingestion)',
+        device_id: deviceId,
+        sequence: data.sequence,
+        is_duplicate: true
+      });
+    }
+
     let sequenceWarning = null;
     if (lastSeq !== undefined) {
-      if (data.sequence <= lastSeq) {
-        sequenceWarning = `Potential duplicate or out-of-order sequence: received ${data.sequence}, last was ${lastSeq}`;
+      if (data.sequence < lastSeq) {
+        sequenceWarning = `Out-of-order sequence: received ${data.sequence}, last was ${lastSeq}`;
         await db.logEvent(deviceId, 'SEQUENCE_ANOMALY', sequenceWarning, 'WARNING');
       } else if (data.sequence > lastSeq + 1) {
         const missing = data.sequence - lastSeq - 1;

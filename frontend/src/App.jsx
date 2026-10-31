@@ -106,6 +106,7 @@ export default function App() {
         sensors={latestReading?.sensors}
         assessment={latestReading?.assessment}
         isStale={latestReading?.is_stale}
+        sourceMode={mode}
       />
 
       {/* 4. Water Quality Assessment & Recommendation Overview */}

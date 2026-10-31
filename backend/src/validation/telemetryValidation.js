@@ -115,8 +115,14 @@ export function validateTelemetryPayload(payload) {
   for (const [key, limit] of Object.entries(SENSOR_PLAUSIBILITY_LIMITS)) {
     const res = validateSensorValue(key, rawSensors[key], limit);
     if (!res.valid) {
-      sensorValidationErrors.push(res.error);
-      sensorValidityFlags[key] = false;
+      if (key === 'temperature_c') {
+        // Temperature is non-dependent contextual metadata: sanitize to null on sensor fault without rejecting telemetry
+        validatedSensors[key] = null;
+        sensorValidityFlags[key] = false;
+      } else {
+        sensorValidationErrors.push(res.error);
+        sensorValidityFlags[key] = false;
+      }
     } else {
       validatedSensors[key] = res.value;
       sensorValidityFlags[key] = res.value !== null;

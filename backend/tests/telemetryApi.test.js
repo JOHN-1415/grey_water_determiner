@@ -3,29 +3,17 @@
  * IoT Greywater Quality Assessment & Recommendation System
  */
 
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { app } from '../src/server.js';
 import { initDatabase } from '../src/database/db.js';
+import { createClient } from './helpers/testClient.js';
 
-let server;
-let baseUrl;
+let client;
 
 before(async () => {
   await initDatabase();
-  await new Promise((resolve) => {
-    server = app.listen(0, () => {
-      const port = server.address().port;
-      baseUrl = `http://localhost:${port}/api/v1`;
-      resolve();
-    });
-  });
-});
-
-after(async () => {
-  if (server) {
-    await new Promise((resolve) => server.close(resolve));
-  }
+  client = createClient(app);
 });
 
 describe('Telemetry API Ingestion & Authentication', () => {
@@ -37,10 +25,9 @@ describe('Telemetry API Ingestion & Authentication', () => {
       source_mode: 'HARDWARE'
     };
 
-    const res = await fetch(`${baseUrl}/telemetry`, {
-      method: 'POST',
+    const res = await client('POST', '/api/v1/telemetry', {
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: payload
     });
 
     assert.equal(res.status, 401);
@@ -56,13 +43,12 @@ describe('Telemetry API Ingestion & Authentication', () => {
       source_mode: 'HARDWARE'
     };
 
-    const res = await fetch(`${baseUrl}/telemetry`, {
-      method: 'POST',
+    const res = await client('POST', '/api/v1/telemetry', {
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': 'incorrect-token-abc'
       },
-      body: JSON.stringify(payload)
+      body: payload
     });
 
     assert.equal(res.status, 403);
@@ -77,13 +63,12 @@ describe('Telemetry API Ingestion & Authentication', () => {
       sensors: { tds_ppm: 'not-a-number', turbidity_ntu: 2.5 }
     };
 
-    const res = await fetch(`${baseUrl}/telemetry`, {
-      method: 'POST',
+    const res = await client('POST', '/api/v1/telemetry', {
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': 'gw-esp32-secret-2026'
       },
-      body: JSON.stringify(invalidPayload)
+      body: invalidPayload
     });
 
     assert.equal(res.status, 400);
@@ -106,13 +91,12 @@ describe('Telemetry API Ingestion & Authentication', () => {
       }
     };
 
-    const res = await fetch(`${baseUrl}/telemetry`, {
-      method: 'POST',
+    const res = await client('POST', '/api/v1/telemetry', {
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': 'gw-esp32-secret-2026'
       },
-      body: JSON.stringify(validPayload)
+      body: validPayload
     });
 
     assert.equal(res.status, 201);
@@ -124,7 +108,7 @@ describe('Telemetry API Ingestion & Authentication', () => {
   });
 
   test('5. Successfully reads latest reading and calculates stale age', async () => {
-    const res = await fetch(`${baseUrl}/devices/GW-001/latest`);
+    const res = await client('GET', '/api/v1/devices/GW-001/latest');
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.status, 'SUCCESS');
@@ -134,7 +118,7 @@ describe('Telemetry API Ingestion & Authentication', () => {
   });
 
   test('6. Reads device history with pagination limit', async () => {
-    const res = await fetch(`${baseUrl}/devices/GW-001/history?limit=10`);
+    const res = await client('GET', '/api/v1/devices/GW-001/history?limit=10');
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.status, 'SUCCESS');
@@ -143,7 +127,7 @@ describe('Telemetry API Ingestion & Authentication', () => {
   });
 
   test('7. Reads device connectivity status', async () => {
-    const res = await fetch(`${baseUrl}/devices/GW-001/status`);
+    const res = await client('GET', '/api/v1/devices/GW-001/status');
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.status, 'SUCCESS');
@@ -152,13 +136,64 @@ describe('Telemetry API Ingestion & Authentication', () => {
   });
 
   test('8. Allows triggering demo scenario via /demo/trigger/:scenarioId', async () => {
-    const res = await fetch(`${baseUrl}/demo/trigger/3`, {
-      method: 'POST'
-    });
+    const res = await client('POST', '/api/v1/demo/trigger/3');
     assert.equal(res.status, 201);
     const body = await res.json();
     assert.equal(body.status, 'SUCCESS');
     assert.equal(body.assessment.treatment_level, 'LEVEL_3');
     assert.equal(body.source_mode, 'SIMULATED');
+  });
+
+  test('9. Correctly accepts hardware telemetry with temperature_c as null without producing UNKNOWN', async () => {
+    const disconnectedPayload = {
+      device_id: 'GW-001',
+      sequence: 201,
+      source_mode: 'HARDWARE',
+      sensors: {
+        tds_ppm: 180.0,
+        turbidity_ntu: 2.5,
+        temperature_c: null // Unplugged DS18B20 probe
+      }
+    };
+
+    const res = await client('POST', '/api/v1/telemetry', {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': 'gw-esp32-secret-2026'
+      },
+      body: disconnectedPayload
+    });
+
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.status, 'SUCCESS');
+    assert.equal(body.assessment.treatment_level, 'LEVEL_1');
+    assert.equal(body.sequence, 201);
+  });
+
+  test('10. Suppresses duplicate sequence without persisting duplicate record (Wi-Fi + Serial dual channel)', async () => {
+    // Send sequence 205 (channel A - e.g. Serial)
+    const initialPayload = {
+      device_id: 'GW-001',
+      sequence: 205,
+      source_mode: 'HARDWARE',
+      sensors: { tds_ppm: 200, turbidity_ntu: 3.0, temperature_c: null }
+    };
+
+    const res1 = await client('POST', '/api/v1/telemetry', {
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': 'gw-esp32-secret-2026' },
+      body: initialPayload
+    });
+    assert.equal(res1.status, 201);
+
+    // Send sequence 205 again (channel B - e.g. Wi-Fi)
+    const res2 = await client('POST', '/api/v1/telemetry', {
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': 'gw-esp32-secret-2026' },
+      body: initialPayload
+    });
+    assert.equal(res2.status, 200);
+    const body2 = await res2.json();
+    assert.equal(body2.is_duplicate, true);
+    assert.equal(body2.sequence, 205);
   });
 });

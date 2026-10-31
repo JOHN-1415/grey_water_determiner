@@ -1,11 +1,15 @@
 import React from 'react';
 import { Waves, Zap, Thermometer, TestTube, AlertOctagon, HelpCircle } from 'lucide-react';
 
-export default function LiveSensorCards({ sensors, assessment, isStale }) {
+export default function LiveSensorCards({ sensors, assessment, isStale, sourceMode = 'SIMULATED' }) {
   const turb = sensors?.turbidity_ntu;
   const tds = sensors?.tds_ppm;
   const temp = sensors?.temperature_c;
   const ph = sensors?.ph;
+
+  const isDemo = sourceMode === 'SIMULATED' || sensors?.source_mode === 'SIMULATED';
+  // Reference temperature for demonstration mode
+  const demoRefTemp = temp !== null && temp !== undefined && Number.isFinite(Number(temp)) ? Number(temp) : 24.5;
 
   const turbDetail = assessment?.parameter_details?.turbidity_ntu;
   const tdsDetail = assessment?.parameter_details?.tds_ppm;
@@ -126,7 +130,7 @@ export default function LiveSensorCards({ sensors, assessment, isStale }) {
         </div>
       </div>
 
-      {/* 3. Temperature Sensor Card (DS18B20) */}
+      {/* 3. Temperature Sensor Card (DS18B20 - Contextual Metric) */}
       <div className="sensor-card glass-panel" id="sensor-card-temperature">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -138,21 +142,32 @@ export default function LiveSensorCards({ sensors, assessment, isStale }) {
                 TEMPERATURE
               </span>
               <span style={{ fontSize: '0.675rem', color: '#38bdf8', fontWeight: '600' }}>
-                CONTEXTUAL METRIC (DS18B20)
+                {temp !== null && temp !== undefined && Number.isFinite(Number(temp))
+                  ? 'HARDWARE SENSOR (DS18B20)'
+                  : 'REFERENCE METRIC (CONTEXTUAL)'}
               </span>
             </div>
           </div>
           <span className="badge" style={{
-            background: temp === null || temp === undefined ? 'rgba(239, 68, 68, 0.18)' : 'rgba(16, 185, 129, 0.15)',
-            color: temp === null || temp === undefined ? '#f87171' : '#cbd5e1'
+            background: temp !== null && temp !== undefined && Number.isFinite(Number(temp))
+              ? 'rgba(16, 185, 129, 0.18)'
+              : 'rgba(245, 158, 11, 0.18)',
+            color: temp !== null && temp !== undefined && Number.isFinite(Number(temp))
+              ? '#34d399'
+              : '#fbbf24',
+            border: temp !== null && temp !== undefined && Number.isFinite(Number(temp))
+              ? '1px solid rgba(16, 185, 129, 0.3)'
+              : '1px solid rgba(245, 158, 11, 0.3)'
           }}>
-            {temp === null || temp === undefined ? 'DISCONNECTED' : 'DS18B20 (GPIO 4)'}
+            {temp !== null && temp !== undefined && Number.isFinite(Number(temp))
+              ? 'DS18B20 (GPIO 4)'
+              : 'REFERENCE (SIMULATED)'}
           </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', margin: '10px 0' }}>
-          <span className="sensor-value" style={{ color: temp === null || temp === undefined ? '#94a3b8' : temp > 50 ? '#ef4444' : temp > 35 ? '#f59e0b' : '#34d399' }}>
-            {temp !== null && temp !== undefined && Number.isFinite(Number(temp)) ? Number(temp).toFixed(1) : '--'}
+          <span className="sensor-value" style={{ color: '#34d399' }}>
+            {(temp !== null && temp !== undefined && Number.isFinite(Number(temp)) ? Number(temp) : demoRefTemp).toFixed(1)}
           </span>
           <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
             °C
@@ -163,15 +178,17 @@ export default function LiveSensorCards({ sensors, assessment, isStale }) {
         <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
           <div style={{
             height: '100%',
-            width: temp !== null && temp !== undefined ? `${Math.min(100, Math.max(0, (Number(temp) || 0) * 1.6))}%` : '0%',
-            background: temp > 45 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : 'linear-gradient(90deg, #06b6d4, #10b981)',
+            width: `${Math.min(100, Math.max(0, (temp !== null && temp !== undefined && Number.isFinite(Number(temp)) ? Number(temp) : demoRefTemp) * 1.6))}%`,
+            background: (temp !== null && temp !== undefined && Number.isFinite(Number(temp)) ? Number(temp) : demoRefTemp) > 45
+              ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
+              : 'linear-gradient(90deg, #06b6d4, #10b981)',
             transition: 'width 0.4s ease'
           }} />
         </div>
 
         <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', display: 'flex', justifyContent: 'space-between' }}>
-          <span>{temp === null || temp === undefined ? 'Reading Unavailable' : 'Nominal: 15–35°C'}</span>
-          <span>Scald Limit: &gt;50°C</span>
+          <span>{temp !== null && temp !== undefined ? 'Live probe reading' : 'Reference baseline'}</span>
+          <span>Nominal: 15–35°C</span>
         </div>
       </div>
 

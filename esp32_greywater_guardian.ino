@@ -42,11 +42,11 @@ const float THRESHOLD_TURBIDITY_LEVEL2_MAX = 25.0;  // NTU (> 25.0 triggers Leve
 const float THRESHOLD_TDS_LEVEL1_MAX       = 300.0; // ppm (<= 300 satisfies Level 1)
 const float THRESHOLD_TDS_LEVEL2_MAX       = 800.0; // ppm (> 800 triggers Level 3)
 
-// --- Wi-Fi Configuration (Optional - Disabled by Default for USB Serial) ---
-const bool ENABLE_WIFI = false; // Set to true only if local WiFi telemetry is desired
-const char* WIFI_SSID     = "YOUR_WIFI_SSID";
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
-const char* SERVER_URL    = "http://192.168.1.100:5000/api/v1/telemetry";
+// --- Wi-Fi Configuration (Enabled for Laptop Hotspot Telemetry) ---
+const bool ENABLE_WIFI = true; // Wi-Fi telemetry active with USB Serial fallback
+const char* WIFI_SSID     = "Robots";
+const char* WIFI_PASSWORD = "12345678";
+const char* SERVER_URL    = "http://192.168.137.1:5000/api/v1/telemetry";
 const char* API_KEY       = "gw-esp32-secret-2026";
 
 // --- Hardware Objects & State ---
@@ -101,19 +101,28 @@ void setup() {
   tempSensors.begin();
   tempSensors.setWaitForConversion(false); // Non-blocking temperature conversion
 
-  // Optional Wi-Fi initialization (Non-blocking)
+  // Wi-Fi initialization (Non-blocking)
   if (ENABLE_WIFI) {
-    Serial.printf("[DIAG] Attempting optional Wi-Fi connection to: %s\n", WIFI_SSID);
+    Serial.printf("[BOOT] Initializing Wi-Fi connection to SSID: %s...\n", WIFI_SSID);
+    WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   } else {
     Serial.println("[BOOT] Wi-Fi disabled. Direct USB Serial communication active at 115200 baud.");
   }
 
-  Serial.println("[BOOT] Setup complete. Streaming sensor assessment JSON records over USB Serial.\n");
+  Serial.println("[BOOT] Setup complete. Streaming sensor assessment JSON records over USB Serial and Wi-Fi.\n");
 }
 
 void loop() {
   unsigned long currentMillis = millis();
+
+  // Non-blocking Wi-Fi auto-reconnect check (every 10 seconds if disconnected)
+  static unsigned long lastWifiCheck = 0;
+  if (ENABLE_WIFI && WiFi.status() != WL_CONNECTED && (currentMillis - lastWifiCheck >= 10000)) {
+    lastWifiCheck = currentMillis;
+    Serial.println("[DIAG] Wi-Fi not connected. Attempting background reconnect to hotspot...");
+    WiFi.reconnect();
+  }
 
   // Periodic Telemetry Interval (~3000 ms)
   if (currentMillis - lastTelemetryMillis >= TELEMETRY_INTERVAL_MS) {
@@ -121,15 +130,19 @@ void loop() {
 
     // --- SENSOR ACQUISITION ---
 
-    // 1. Temperature Acquisition (DS18B20 on GPIO 4)
-    tempSensors.requestTemperatures();
-    float tempC = tempSensors.getTempCByIndex(0);
-    bool tempValid = true;
+    // 1. Temperature Acquisition (DS18B20 on GPIO 4 - Non-blocking, Non-dependent)
+    // Removed as a mandatory dependency. Failure or disconnection never interrupts TDS or Turbidity.
+    float tempC = -127.0;
+    bool tempValid = false;
 
-    // Validate temperature reading - do NOT substitute 25.0°C when disconnected!
-    // DallasTemperature returns DEVICE_DISCONNECTED_C (-127.0°C) or 85.0°C on power-on reset.
-    if (tempC <= -127.0 || tempC < -20.0 || tempC > 100.0) {
-      tempValid = false;
+    // Only attempt conversion if 1-Wire device is physically present on bus
+    if (tempSensors.getDeviceCount() > 0) {
+      tempSensors.requestTemperatures();
+      tempC = tempSensors.getTempCByIndex(0);
+      // Validate: Dallas chips output -127.0°C on disconnect and 85.0°C on uncompleted power-on reset
+      if (tempC > -20.0 && tempC < 85.0 && tempC != -127.0) {
+        tempValid = true;
+      }
     }
 
     // 2. TDS Acquisition (GPIO 34)
@@ -159,16 +172,16 @@ void loop() {
     }
 
     // --- WATER QUALITY CLASSIFICATION ---
+    // Deterministic classification derived strictly from TDS and Turbidity
     String classification = calculateClassification(tdsValid, tdsPpm, turbValid, turbidityNtu);
 
     // --- JSON TELEMETRY EMISSION OVER USB SERIAL ---
     // Exactly ONE valid JSON object per line, ending with '\n'.
-    // Diagnostics are printed separately on lines prefixed with [DIAG] or [BOOT].
     String jsonRecord = "{";
     jsonRecord += "\"device_id\":\"" + String(DEVICE_ID) + "\",";
     jsonRecord += "\"sequence\":" + String(sequenceNumber++) + ",";
 
-    // Temperature (null if probe disconnected)
+    // Temperature (null if probe disconnected or unavailable; do not fabricate)
     jsonRecord += "\"temperature_c\":";
     if (tempValid) {
       jsonRecord += String(tempC, 1) + ",";
@@ -196,16 +209,21 @@ void loop() {
     jsonRecord += "\"source_mode\":\"HARDWARE\"";
     jsonRecord += "}";
 
-    // Transmit JSON over USB Serial
+    // Primary / Fallback Output: Stream JSON over USB Serial at 115200 baud
     Serial.println(jsonRecord);
 
-    // Optional Wi-Fi HTTP POST
+    // Optional Wi-Fi HTTP POST Telemetry (Non-blocking with 1.5s timeout)
     if (ENABLE_WIFI && WiFi.status() == WL_CONNECTED) {
       HTTPClient http;
       http.begin(SERVER_URL);
+      http.setTimeout(1500); // 1.5 second network timeout prevents loop stalling
       http.addHeader("Content-Type", "application/json");
       http.addHeader("X-API-Key", API_KEY);
-      http.POST(jsonRecord);
+      int httpResponseCode = http.POST(jsonRecord);
+      if (httpResponseCode <= 0) {
+        // Log diagnostic warning to Serial without disrupting JSON streaming
+        Serial.printf("[DIAG] Wi-Fi HTTP POST error code: %d\n", httpResponseCode);
+      }
       http.end();
     }
   }

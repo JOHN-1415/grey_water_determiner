@@ -15,6 +15,7 @@ dotenv.config();
 
 export const app = express();
 const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Middleware
 app.use(cors());
@@ -62,15 +63,16 @@ export async function startServer() {
     console.warn('[Bootstrap] Demo baseline seed notice:', err.message);
   }
 
-  const server = app.listen(PORT, () => {
+  const server = app.listen(PORT, HOST, () => {
     console.log(`====================================================`);
-    console.log(`GreyWater Guardian Backend running on port ${PORT}`);
+    console.log(`GreyWater Guardian Backend running on http://${HOST}:${PORT}`);
+    console.log(`Wi-Fi Hotspot Endpoint: http://192.168.137.1:${PORT}/api/v1/telemetry`);
     console.log(`Mode: ${getDbMode()}`);
-    console.log(`REST API: http://localhost:${PORT}/api/v1`);
     console.log(`====================================================`);
   });
 
-  // Launch background USB Serial Collector if enabled
+  // Automatically launch USB Serial Collector on startup
+  // Connects to COM7 at 115200 baud to read live physical sensor stream
   if (process.env.SERIAL_AUTO_START !== 'false') {
     try {
       await startSerialCollector();

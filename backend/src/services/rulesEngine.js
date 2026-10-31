@@ -304,7 +304,7 @@ export function assessWaterQuality(sensors, customConfig = null, metadata = {}) 
     }
   }
 
-  // 3. Temperature Assessment (°C) - Contextual Only (Does NOT independently alter treatment level)
+  // 3. Temperature Assessment (°C) - Contextual Only (Non-dependent; does NOT determine treatment level)
   const temp = sensors.temperature_c;
   if (temp === null || temp === undefined) {
     parameterDetails.temperature_c = {
@@ -314,7 +314,13 @@ export function assessWaterQuality(sensors, customConfig = null, metadata = {}) 
       context: 'DS18B20 temperature probe reading unavailable or probe disconnected'
     };
   } else if (!Number.isFinite(Number(temp)) || Number(temp) < -10 || Number(temp) > 85) {
-    sensorErrors.push(`Temperature sensor reading is implausible: ${temp}`);
+    // Non-dependent contextual metric: Flag as SENSOR_ANOMALY without pushing to sensorErrors or aborting classification
+    parameterDetails.temperature_c = {
+      value: Number.isFinite(Number(temp)) ? Number(temp) : null,
+      unit: '°C',
+      status: 'SENSOR_ANOMALY',
+      context: `Temperature reading (${temp}) is abnormal or out of range [-10°C to 85°C]; contextual metric bypassed without affecting water treatment classification.`
+    };
   } else {
     const val = Number(temp);
     parametersConsidered.push('temperature_c');
