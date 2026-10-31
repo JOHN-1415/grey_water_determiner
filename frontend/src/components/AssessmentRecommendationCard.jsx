@@ -1,5 +1,6 @@
 import React from 'react';
-import { ShieldCheck, AlertTriangle, HelpCircle, CheckCircle2, AlertOctagon, Info } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, CheckCircle2, ShieldAlert, Sparkles, Layers } from 'lucide-react';
+import { getScientificLimitations } from '../utils/rulesEngine';
 
 export default function AssessmentRecommendationCard({ assessment }) {
   const level = assessment?.treatment_level || 'UNKNOWN';
@@ -8,16 +9,17 @@ export default function AssessmentRecommendationCard({ assessment }) {
   const reasons = assessment?.reasons || [];
   const outsideParams = assessment?.parameters_outside_criteria || [];
   const considered = assessment?.parameters_considered || [];
-  const disclaimer = assessment?.safety_disclaimer;
+  const rec = assessment?.recommendation;
 
   const levelColorMap = {
-    BASIC: { bg: 'rgba(16, 185, 129, 0.12)', border: '#10b981', text: '#34d399', badge: 'level-basic' },
-    MEDIUM: { bg: 'rgba(6, 182, 212, 0.12)', border: '#06b6d4', text: '#38bdf8', badge: 'level-medium' },
-    HIGH: { bg: 'rgba(245, 158, 11, 0.12)', border: '#f59e0b', text: '#fbbf24', badge: 'level-high' },
-    UNKNOWN: { bg: 'rgba(239, 68, 68, 0.12)', border: '#ef4444', text: '#f87171', badge: 'level-unknown' }
+    LEVEL_1: { bg: 'rgba(16, 185, 129, 0.12)', border: '#10b981', text: '#34d399', badge: 'level-basic', title: 'LEVEL 1 — BASIC TREATMENT RECOMMENDATION' },
+    LEVEL_2: { bg: 'rgba(56, 189, 248, 0.12)', border: '#0284c7', text: '#38bdf8', badge: 'level-medium', title: 'LEVEL 2 — MODERATE TREATMENT RECOMMENDATION' },
+    LEVEL_3: { bg: 'rgba(245, 158, 11, 0.12)', border: '#f59e0b', text: '#fbbf24', badge: 'level-high', title: 'LEVEL 3 — ADVANCED TREATMENT RECOMMENDATION' },
+    UNKNOWN: { bg: 'rgba(239, 68, 68, 0.12)', border: '#ef4444', text: '#f87171', badge: 'level-unknown', title: 'UNKNOWN / INSUFFICIENT SENSOR DATA' }
   };
 
   const currentTheme = levelColorMap[level] || levelColorMap.UNKNOWN;
+  const limitations = getScientificLimitations();
 
   return (
     <div className="glass-panel" style={{
@@ -31,17 +33,17 @@ export default function AssessmentRecommendationCard({ assessment }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
-              WATER QUALITY CLASSIFICATION & ADAPTIVE RECOMMENDATION
+              WATER QUALITY CLASSIFICATION & TREATMENT RECOMMENDATION
             </span>
             <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#cbd5e1', fontSize: '0.7rem' }}>
-              Rules v{assessment?.rules_version || '1.0.0'}
+              Engine v{assessment?.rules_version || '2.0.0'}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.8rem', fontWeight: '800', color: currentTheme.text }}>
-                {level === 'UNKNOWN' ? 'UNKNOWN / SAFE HOLD' : `${level} TREATMENT`}
+              <span style={{ fontSize: '1.6rem', fontWeight: '800', color: currentTheme.text }}>
+                {currentTheme.title}
               </span>
             </div>
             <span className={`badge ${currentTheme.badge}`} style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
@@ -50,7 +52,7 @@ export default function AssessmentRecommendationCard({ assessment }) {
           </div>
         </div>
 
-        {/* Outside Criteria Tags */}
+        {/* Criteria Deviations */}
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', marginBottom: '4px' }}>
             CRITERIA DEVIATIONS
@@ -63,7 +65,7 @@ export default function AssessmentRecommendationCard({ assessment }) {
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               {outsideParams.map((param) => (
                 <span key={param} className="badge level-high" style={{ fontSize: '0.75rem' }}>
-                  {param} Exceeds Limits
+                  {param} Exceeds Baseline
                 </span>
               ))}
             </div>
@@ -71,16 +73,16 @@ export default function AssessmentRecommendationCard({ assessment }) {
         </div>
       </div>
 
-      {/* Explanation Box */}
+      {/* Explanation & Rationale */}
       <div style={{
         background: 'rgba(15, 23, 42, 0.7)',
         borderRadius: '12px',
-        padding: '14px 18px',
+        padding: '16px',
         border: '1px solid var(--border-subtle)',
         marginBottom: '16px'
       }}>
-        <div style={{ fontSize: '0.95rem', color: '#f1f5f9', lineHeight: '1.6', marginBottom: reasons.length > 0 ? '10px' : '0' }}>
-          <strong>Assessment Rationale:</strong> {explanation}
+        <div style={{ fontSize: '0.95rem', color: '#f1f5f9', lineHeight: '1.6', marginBottom: reasons.length > 0 ? '8px' : '0' }}>
+          <strong>Assessment Rationale: </strong> {explanation}
         </div>
 
         {reasons.length > 0 && (
@@ -91,47 +93,56 @@ export default function AssessmentRecommendationCard({ assessment }) {
           </ul>
         )}
 
-        {(level === 'MEDIUM' || level === 'HIGH') && (
+        {/* Informational Treatment Guidance Box */}
+        {rec?.suggested_treatment_methods && (
           <div style={{
             marginTop: '12px',
-            padding: '10px 14px',
+            padding: '12px',
             borderRadius: '8px',
-            background: 'rgba(245, 158, 11, 0.1)',
-            border: '1px solid rgba(245, 158, 11, 0.3)',
-            fontSize: '0.825rem',
-            color: '#fef3c7'
+            background: 'rgba(30, 41, 59, 0.6)',
+            border: '1px solid rgba(148, 163, 184, 0.15)'
           }}>
-            <strong>Prototype Hardware Note:</strong> Assessed requirement ({level}) exceeds the current physical prototype, which contains <strong>only Stage 1 basic physical filtration</strong>. Stage 2 / Stage 3 modules are not physically present.
+            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: currentTheme.text, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Layers size={16} /> Suggested External Treatment Approaches:
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.825rem', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {rec.suggested_treatment_methods.map((method, idx) => (
+                <li key={idx}>{method}</li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
 
-      {/* Metadata info: Parameters considered */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+      {/* Evaluated Parameters Summary */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
         <div>
           <strong>Parameters Evaluated:</strong> {considered.length > 0 ? considered.join(', ') : 'None'}
-          {considered.includes('ph') ? ' (including optional pH)' : ' (optional pH sensor bypassed)'}
+          {considered.includes('ph') ? ' (including optional pH)' : ' (optional pH uninstalled)'}
         </div>
         <div>
-          <strong>Timestamp:</strong> {assessment?.timestamp ? new Date(assessment.timestamp).toLocaleTimeString() : '--'}
+          <strong>Evaluated At:</strong> {assessment?.timestamp ? new Date(assessment.timestamp).toLocaleTimeString() : '--'}
         </div>
       </div>
 
-      {/* Mandatory Safety Disclaimer Banner */}
+      {/* Scientific & Regulatory Limitations */}
       <div style={{
-        marginTop: '16px',
-        padding: '10px 14px',
+        padding: '12px 14px',
         background: 'rgba(239, 68, 68, 0.08)',
         border: '1px solid rgba(239, 68, 68, 0.25)',
-        borderRadius: '8px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px'
+        borderRadius: '8px'
       }}>
-        <AlertTriangle size={18} color="#f87171" style={{ flexShrink: 0 }} />
-        <span style={{ fontSize: '0.775rem', color: '#fca5a5', lineHeight: '1.4' }}>
-          <strong>Environmental & Health Disclaimer:</strong> {disclaimer || 'Treated water is intended strictly for controlled non-potable reuse (toilet flushing, landscaping, cleaning). Turbidity, TDS, and pH do not verify microbiological safety. Do NOT consume.'}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <ShieldAlert size={16} color="#f87171" style={{ flexShrink: 0 }} />
+          <strong style={{ fontSize: '0.8rem', color: '#fca5a5' }}>
+            Important Scientific & Regulatory Limitations:
+          </strong>
+        </div>
+        <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.775rem', color: '#fecaca', lineHeight: '1.4' }}>
+          {limitations.map((limit, idx) => (
+            <li key={idx}>{limit}</li>
+          ))}
+        </ul>
       </div>
 
     </div>

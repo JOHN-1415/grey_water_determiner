@@ -4,47 +4,51 @@ import { Droplet, Flower2, Car, Sparkles, XCircle, CheckCircle, AlertTriangle } 
 export default function NonPotableReuseMatrix({ treatmentLevel, assessmentStatus }) {
   const isHealthy = treatmentLevel !== 'UNKNOWN' && assessmentStatus !== 'SENSOR_ERROR' && assessmentStatus !== 'OFFLINE';
 
+  const isLevel1 = treatmentLevel === 'LEVEL_1' || treatmentLevel === 'BASIC';
+  const isLevel2 = treatmentLevel === 'LEVEL_2' || treatmentLevel === 'MEDIUM';
+  const isLevel3 = treatmentLevel === 'LEVEL_3' || treatmentLevel === 'HIGH';
+
   const applications = [
     {
       id: 'toilet',
       name: 'Toilet Flushing',
       icon: <Droplet size={20} />,
-      requiredMinLevel: 'BASIC',
+      requiredMinLevel: 'LEVEL 1',
       isAllowed: isHealthy,
-      note: 'Primary domestic conservation target; reduces household freshwater demand by up to 30%.'
+      note: 'Primary domestic conservation target; reduces household freshwater consumption by up to 30%.'
     },
     {
       id: 'irrigation',
       name: 'Landscape & Garden Subsurface',
       icon: <Flower2 size={20} />,
-      requiredMinLevel: 'BASIC',
-      isAllowed: isHealthy && treatmentLevel !== 'HIGH',
-      note: 'Sub-surface irrigation for ornamental lawns, trees, and shrubs (never spray on edible food crops).'
+      requiredMinLevel: 'LEVEL 1',
+      isAllowed: isHealthy && !isLevel3,
+      note: 'Sub-surface irrigation for ornamental lawns, shrubs, and shade trees (never spray on edible food crops).'
     },
     {
       id: 'cleaning',
       name: 'Floor & Pavement Washing',
       icon: <Sparkles size={20} />,
-      requiredMinLevel: 'MEDIUM',
-      isAllowed: isHealthy && (treatmentLevel === 'MEDIUM' || treatmentLevel === 'HIGH'),
-      note: 'Requires carbon filtration to eliminate soap scum residues and odor on exterior surfaces.'
+      requiredMinLevel: 'LEVEL 2',
+      isAllowed: isHealthy && (isLevel2 || isLevel3),
+      note: 'Requires adsorption/filtration to eliminate surfactant soap residues and odor on exterior surfaces.'
     },
     {
       id: 'vehicle',
       name: 'Vehicle & Equipment Rinsing',
       icon: <Car size={20} />,
-      requiredMinLevel: 'MEDIUM',
-      isAllowed: isHealthy && (treatmentLevel === 'MEDIUM' || treatmentLevel === 'HIGH'),
-      note: 'Requires low turbidity (≤ 10 NTU) to prevent streaking or abrasive particulates.'
+      requiredMinLevel: 'LEVEL 2',
+      isAllowed: isHealthy && (isLevel2 || isLevel3),
+      note: 'Requires low turbidity (≤ 10 NTU) to prevent streaking or abrasive grit damage.'
     },
     {
       id: 'potable',
       name: 'Drinking / Cooking / Bathing',
       icon: <XCircle size={20} />,
-      requiredMinLevel: 'PROHIBITED',
+      requiredMinLevel: 'STRICTLY PROHIBITED',
       isAllowed: false,
       isStrictlyProhibited: true,
-      note: 'STRICTLY PROHIBITED. Greywater filtration does not remove pathogenic bacteria or viruses.'
+      note: 'STRICTLY PROHIBITED. Greywater assessment does not evaluate or guarantee microbiological safety.'
     }
   ];
 
@@ -54,15 +58,15 @@ export default function NonPotableReuseMatrix({ treatmentLevel, assessmentStatus
         <div>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Droplet size={20} color="#10b981" />
-            Approved Non-Potable Water Reuse Applications
+            Approved Non-Potable Water Reuse Guidance
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Permissible utilization matrix matched against current water classification
+            Permissible non-potable reuse utilization matrix matched against current water quality assessment
           </p>
         </div>
 
         <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#94a3b8', fontSize: '0.75rem' }}>
-          WHO & EPA Non-Potable Guidelines
+          Non-Potable Regulatory Reference Matrix
         </span>
       </div>
 
@@ -103,47 +107,38 @@ export default function NonPotableReuseMatrix({ treatmentLevel, assessmentStatus
                     ? 'rgba(239, 68, 68, 0.2)'
                     : app.isAllowed
                     ? 'rgba(16, 185, 129, 0.2)'
-                    : 'rgba(148, 163, 184, 0.1)',
-                  color: app.isStrictlyProhibited
-                    ? '#f87171'
-                    : app.isAllowed
-                    ? '#34d399'
-                    : '#94a3b8'
+                    : 'rgba(255, 255, 255, 0.05)',
+                  color: app.isStrictlyProhibited ? '#f87171' : app.isAllowed ? '#34d399' : '#94a3b8'
                 }}>
                   {app.icon}
                 </div>
 
-                {app.isStrictlyProhibited ? (
-                  <span className="badge badge-error" style={{ fontSize: '0.65rem' }}>
-                    PROHIBITED
-                  </span>
-                ) : app.isAllowed ? (
-                  <span className="badge level-basic" style={{ fontSize: '0.65rem' }}>
-                    SUITABLE
-                  </span>
-                ) : (
-                  <span className="badge level-unknown" style={{ fontSize: '0.65rem' }}>
-                    NOT RECOMMENDED
-                  </span>
-                )}
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: '700',
+                  color: app.isStrictlyProhibited ? '#f87171' : app.isAllowed ? '#34d399' : '#94a3b8'
+                }}>
+                  {app.isStrictlyProhibited ? 'PROHIBITED' : app.isAllowed ? 'SUITABLE' : 'RESTRICTED'}
+                </span>
               </div>
 
-              <h4 style={{ fontSize: '0.925rem', fontWeight: '700', marginBottom: '6px', color: '#f8fafc' }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#f1f5f9', marginBottom: '4px' }}>
                 {app.name}
-              </h4>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '12px' }}>
+              </div>
+
+              <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '12px' }}>
                 {app.note}
-              </p>
+              </div>
             </div>
 
             <div style={{
-              fontSize: '0.7rem',
+              fontSize: '0.725rem',
               color: 'var(--text-subtle)',
-              fontFamily: 'var(--font-mono)',
-              borderTop: '1px solid var(--border-subtle)',
-              paddingTop: '8px'
+              borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+              paddingTop: '8px',
+              fontFamily: 'var(--font-mono)'
             }}>
-              Required: {app.requiredMinLevel}
+              Suggested Baseline: {app.requiredMinLevel}
             </div>
           </div>
         ))}

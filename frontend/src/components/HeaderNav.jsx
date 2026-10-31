@@ -1,5 +1,5 @@
 import React from 'react';
-import { Droplet, Activity, Sliders, Cpu, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Droplet, Activity, Sliders, Cpu, RefreshCw, FileText } from 'lucide-react';
 
 export default function HeaderNav({
   mode,
@@ -11,9 +11,10 @@ export default function HeaderNav({
   isRefreshing,
   onRefresh,
   onOpenConfig,
-  onOpenHardwareModal
+  onOpenHardwareModal,
+  onOpenReportModal
 }) {
-  const connectivity = deviceStatus?.connectivity || 'UNKNOWN';
+  const connectivity = deviceStatus?.connectivity || (deviceStatus?.is_online ? 'ONLINE' : (deviceStatus?.is_stale ? 'STALE_DATA' : 'OFFLINE'));
   const isSimulated = mode === 'SIMULATED';
   const lastTimeStr = latestReading?.received_at ? new Date(latestReading.received_at).toLocaleTimeString() : null;
 
@@ -37,20 +38,20 @@ export default function HeaderNav({
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1 style={{ fontSize: '1.4rem', fontWeight: '800', letterSpacing: '-0.02em', background: 'linear-gradient(to right, #ffffff, #38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              <h1 style={{ fontSize: '1.4rem', fontWeight: '800', letterSpacing: '-0.02em', background: 'linear-gradient(to right, #ffffff, #38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
                 GreyWater Guardian
               </h1>
               <span className={`badge ${isSimulated ? 'badge-simulated' : 'badge-hardware'}`} id="source-mode-badge">
                 {isSimulated ? 'SIMULATED DEMO' : 'LIVE ESP32'}
               </span>
             </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Adaptive Greywater Quality Detection & Multi-Stage Filtration
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+              IoT Greywater Quality Assessment & Treatment Recommendation System
             </p>
           </div>
         </div>
 
-        {/* Status Indicators & Mode Switcher */}
+        {/* Status Indicators & Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           
           {/* Mode Switcher Toggle */}
@@ -108,7 +109,7 @@ export default function HeaderNav({
             )}
           </div>
 
-          {/* USB Serial Status Pill (When in Hardware mode or serial detected) */}
+          {/* USB Serial Status Pill */}
           {(!isSimulated || serialStatus?.status === 'CONNECTED') && (
             <div style={{
               display: 'flex',
@@ -147,13 +148,24 @@ export default function HeaderNav({
           </button>
 
           <button
+            id="report-modal-btn"
+            className="btn btn-secondary"
+            onClick={onOpenReportModal}
+            title="View & Download Assessment Reports"
+            style={{ padding: '8px 14px', gap: '6px' }}
+          >
+            <FileText size={15} color="#38bdf8" />
+            <span>Assessment Report</span>
+          </button>
+
+          <button
             id="open-config-btn"
             className="btn btn-secondary"
             onClick={onOpenConfig}
             style={{ padding: '8px 14px' }}
           >
             <Sliders size={15} />
-            <span>Rules Config</span>
+            <span>Criteria Config</span>
           </button>
 
           <button
@@ -163,7 +175,7 @@ export default function HeaderNav({
             style={{ padding: '8px 14px' }}
           >
             <Cpu size={15} />
-            <span>ESP32 Integration</span>
+            <span>ESP32 Hardware</span>
           </button>
 
         </div>

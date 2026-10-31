@@ -3,13 +3,13 @@ import HeaderNav from './components/HeaderNav';
 import DemoScenarioSelector from './components/DemoScenarioSelector';
 import LiveSensorCards from './components/LiveSensorCards';
 import AssessmentRecommendationCard from './components/AssessmentRecommendationCard';
-import FiltrationPipelineVisualizer from './components/FiltrationPipelineVisualizer';
-import PostTreatmentVerification from './components/PostTreatmentVerification';
+import TreatmentRecommendationGuide from './components/TreatmentRecommendationGuide';
 import NonPotableReuseMatrix from './components/NonPotableReuseMatrix';
 import HistoricalCharts from './components/HistoricalCharts';
 import SystemEventsTable from './components/SystemEventsTable';
 import ConfigModal from './components/ConfigModal';
 import HardwareIntegrationModal from './components/HardwareIntegrationModal';
+import AssessmentReportModal from './components/AssessmentReportModal';
 import { dataProvider } from './services/dataProvider';
 
 export default function App() {
@@ -25,6 +25,7 @@ export default function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isHardwareModalOpen, setIsHardwareModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   // Core Data Fetcher
   const refreshData = useCallback(async () => {
@@ -90,6 +91,7 @@ export default function App() {
         onRefresh={refreshData}
         onOpenConfig={() => setIsConfigModalOpen(true)}
         onOpenHardwareModal={() => setIsHardwareModalOpen(true)}
+        onOpenReportModal={() => setIsReportModalOpen(true)}
       />
 
       {/* 2. Demo Scenario Selector (10 Presets) */}
@@ -106,41 +108,33 @@ export default function App() {
         isStale={latestReading?.is_stale}
       />
 
-      {/* 4. Adaptive Water Quality Assessment & Recommendation */}
+      {/* 4. Water Quality Assessment & Recommendation Overview */}
       <AssessmentRecommendationCard
         assessment={latestReading?.assessment}
       />
 
-      {/* 5. Adaptive Multi-Stage Filtration Pipeline Visualizer */}
-      <FiltrationPipelineVisualizer
+      {/* 5. Recommended External Treatment Pathway Guide (Informational) */}
+      <TreatmentRecommendationGuide
         assessment={latestReading?.assessment}
-        treatment={latestReading?.treatment}
-        sourceMode={latestReading?.source_mode || mode}
       />
 
-      {/* 6. Post-Treatment Verification (Dual sensor before/after or omitted notice) */}
-      <PostTreatmentVerification
-        inputSensors={latestReading?.sensors}
-        outputSensors={latestReading?.output_sensors}
-      />
-
-      {/* 7. Approved Non-Potable Water Reuse Suitability Matrix */}
+      {/* 6. Approved Non-Potable Water Reuse Suitability Matrix */}
       <NonPotableReuseMatrix
         treatmentLevel={latestReading?.assessment?.treatment_level}
         assessmentStatus={latestReading?.assessment?.assessment_status}
       />
 
-      {/* 8. Historical Telemetry Charts */}
+      {/* 7. Historical Telemetry Charts */}
       <HistoricalCharts
         history={history}
       />
 
-      {/* 9. System Events & Sequence Anomaly Log */}
+      {/* 8. System Events & Anomaly Log */}
       <SystemEventsTable
         events={events}
       />
 
-      {/* 10. Modals */}
+      {/* 9. Modals */}
       <ConfigModal
         isOpen={isConfigModalOpen}
         onClose={() => setIsConfigModalOpen(false)}
@@ -155,6 +149,13 @@ export default function App() {
         onClose={() => setIsHardwareModalOpen(false)}
       />
 
+      <AssessmentReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        latestReading={latestReading}
+        history={history}
+      />
+
       {/* Footer */}
       <footer style={{
         marginTop: '40px',
@@ -166,13 +167,13 @@ export default function App() {
         lineHeight: 1.6
       }}>
         <div>
-          <strong>GreyWater Guardian</strong> — Adaptive Greywater Quality Detection & Multi-Stage Filtration System
+          <strong>GreyWater Guardian</strong> — IoT Greywater Quality Assessment & Treatment Recommendation System
         </div>
         <div>
           Target Project Review: <strong>2 November 2026</strong> • Department of Environmental Science & IoT Engineering
         </div>
         <div>
-          Built with React 19, Vite PWA, Express REST API & Deterministic Rules Engine • Zero Hardware Lock-in
+          Built with React 19, Vite PWA, Express REST API & Deterministic Rules Engine • Sensor-Based Quality Analysis
         </div>
       </footer>
 

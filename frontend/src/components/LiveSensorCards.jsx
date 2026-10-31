@@ -62,8 +62,8 @@ export default function LiveSensorCards({ sensors, assessment, isStale }) {
         </div>
 
         <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', display: 'flex', justifyContent: 'space-between' }}>
-          <span>Basic: ≤5.0 NTU</span>
-          <span>Medium: ≤25 NTU</span>
+          <span>Level 1: ≤5.0 NTU</span>
+          <span>Level 2: ≤25.0 NTU</span>
         </div>
       </div>
 
@@ -111,8 +111,8 @@ export default function LiveSensorCards({ sensors, assessment, isStale }) {
         </div>
 
         <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', display: 'flex', justifyContent: 'space-between' }}>
-          <span>Basic: ≤300 ppm</span>
-          <span>Medium: ≤800 ppm</span>
+          <span>Level 1: ≤300 ppm</span>
+          <span>Level 2: ≤800 ppm</span>
         </div>
       </div>
 

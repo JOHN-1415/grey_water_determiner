@@ -1,12 +1,14 @@
 /**
  * Telemetry Validation Module for GreyWater Guardian
  *
- * Implements strict payload validation:
+ * Implements strict payload validation for IoT Greywater Quality Assessment:
  * - Checks types and required fields
  * - Validates finite numeric values
- * - Enforces plausible sensor ranges
- * - Treats pH as optional (nullable)
- * - Flags sensor errors without replacing values with zero
+ * - Enforces plausible physical sensor ranges
+ * - Treats pH as optional / uninstalled
+ * - Treats temperature as nullable (DS18B20 disconnect)
+ * - Flags sensor errors without fabricating values
+ * - Excludes obsolete pump / filtration control fields
  */
 
 export const SENSOR_PLAUSIBILITY_LIMITS = {
@@ -24,12 +26,12 @@ export function validateSensorValue(key, value, config = SENSOR_PLAUSIBILITY_LIM
     return { valid: true, value };
   }
 
-  // Handle optional sensors (like pH)
+  // Handle optional or nullable sensors
   if (value === null || value === undefined) {
     if (config.optional) {
       return { valid: true, value: null, isMissingOptional: true };
     }
-    return { valid: false, error: `Required sensor '${key}' is missing` };
+    return { valid: false, error: `Required sensor '${key}' is missing or null` };
   }
 
   // Must be a number or valid numeric string
@@ -47,6 +49,18 @@ export function validateSensorValue(key, value, config = SENSOR_PLAUSIBILITY_LIM
   }
 
   return { valid: true, value: num };
+}
+
+/**
+ * Normalizes classification to standard LEVEL_1, LEVEL_2, LEVEL_3, UNKNOWN
+ */
+export function normalizeClassification(cls) {
+  if (!cls) return null;
+  const upper = String(cls).trim().toUpperCase();
+  if (upper === 'BASIC' || upper === 'LEVEL_1' || upper === '1') return 'LEVEL_1';
+  if (upper === 'MEDIUM' || upper === 'LEVEL_2' || upper === '2') return 'LEVEL_2';
+  if (upper === 'HIGH' || upper === 'LEVEL_3' || upper === '3') return 'LEVEL_3';
+  return 'UNKNOWN';
 }
 
 /**
@@ -96,13 +110,16 @@ export function validateTelemetryPayload(payload) {
 
   const validatedSensors = {};
   const sensorValidationErrors = [];
+  const sensorValidityFlags = {};
 
   for (const [key, limit] of Object.entries(SENSOR_PLAUSIBILITY_LIMITS)) {
     const res = validateSensorValue(key, rawSensors[key], limit);
     if (!res.valid) {
       sensorValidationErrors.push(res.error);
+      sensorValidityFlags[key] = false;
     } else {
       validatedSensors[key] = res.value;
+      sensorValidityFlags[key] = res.value !== null;
     }
   }
 
@@ -110,37 +127,11 @@ export function validateTelemetryPayload(payload) {
     errors.push(...sensorValidationErrors);
   }
 
-  // Optional output_sensors validation (post-treatment verification)
-  let validatedOutputSensors = null;
-  if (payload.output_sensors && typeof payload.output_sensors === 'object') {
-    validatedOutputSensors = {};
-    for (const [key, limit] of Object.entries(SENSOR_PLAUSIBILITY_LIMITS)) {
-      if (payload.output_sensors[key] !== undefined) {
-        const res = validateSensorValue(key, payload.output_sensors[key], limit);
-        if (!res.valid) {
-          errors.push(`Output ${res.error}`);
-        } else {
-          validatedOutputSensors[key] = res.value;
-        }
-      }
-    }
-  }
-
-  // Treatment state validation (Prototype has only Stage 1 physical filtration)
-  const pumpStatus = payload.pump_status || payload.treatment?.pump_status || 'UNKNOWN';
-  const activeStage = payload.treatment?.active_stage !== undefined
-    ? payload.treatment.active_stage
-    : (pumpStatus === 'ON' ? 1 : 0);
-
-  const validatedTreatment = {
-    active_stage: (activeStage === null || activeStage === undefined) ? null : Number(activeStage),
-    stage_1: payload.treatment?.stage_1 || (pumpStatus === 'ON' ? 'ACTIVE' : 'IDLE'),
-    stage_2: 'NOT_INSTALLED', // Physical prototype does not implement Stage 2
-    stage_3: 'NOT_INSTALLED', // Physical prototype does not implement Stage 3
-    pump_status: pumpStatus
-  };
-
   const isValid = errors.length === 0;
+
+  // Normalized classification from hardware or simulation if provided
+  const rawClass = payload.classification || payload.recommended_treatment_level;
+  const classification = normalizeClassification(rawClass);
 
   return {
     isValid,
@@ -151,10 +142,9 @@ export function validateTelemetryPayload(payload) {
           sequence: seq,
           uptime_seconds: Number.isFinite(uptime) ? uptime : 0,
           sensors: validatedSensors,
+          sensor_validity: sensorValidityFlags,
           device_status: payload.device_status || 'ONLINE',
-          treatment: validatedTreatment,
-          output_sensors: validatedOutputSensors,
-          classification: payload.classification || null,
+          classification,
           source_mode: payload.source_mode || 'HARDWARE'
         }
       : null

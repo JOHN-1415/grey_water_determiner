@@ -1,5 +1,6 @@
 /**
  * Automated Tests for GreyWater Guardian REST API & Hardware Ingestion
+ * IoT Greywater Quality Assessment & Recommendation System
  */
 
 import { test, describe, before, after } from 'node:test';
@@ -102,13 +103,6 @@ describe('Telemetry API Ingestion & Authentication', () => {
         tds_ppm: 340.0,
         turbidity_ntu: 8.5,
         temperature_c: 25.5
-      },
-      treatment: {
-        active_stage: 2,
-        stage_1: 'COMPLETED',
-        stage_2: 'ACTIVE',
-        stage_3: 'BYPASSED',
-        pump_status: 'ON'
       }
     };
 
@@ -124,8 +118,9 @@ describe('Telemetry API Ingestion & Authentication', () => {
     assert.equal(res.status, 201);
     const body = await res.json();
     assert.equal(body.status, 'SUCCESS');
-    assert.equal(body.assessment.treatment_level, 'MEDIUM');
+    assert.equal(body.assessment.treatment_level, 'LEVEL_2');
     assert.equal(body.source_mode, 'HARDWARE');
+    assert.ok(body.assessment.recommendation);
   });
 
   test('5. Successfully reads latest reading and calculates stale age', async () => {
@@ -135,7 +130,7 @@ describe('Telemetry API Ingestion & Authentication', () => {
     assert.equal(body.status, 'SUCCESS');
     assert.equal(body.data.device_id, 'GW-001');
     assert.equal(body.data.sequence, 200);
-    assert.equal(body.data.assessment.treatment_level, 'MEDIUM');
+    assert.equal(body.data.assessment.treatment_level, 'LEVEL_2');
   });
 
   test('6. Reads device history with pagination limit', async () => {
@@ -153,7 +148,7 @@ describe('Telemetry API Ingestion & Authentication', () => {
     const body = await res.json();
     assert.equal(body.status, 'SUCCESS');
     assert.equal(body.data.device_id, 'GW-001');
-    assert.equal(body.data.connectivity, 'ONLINE');
+    assert.equal(body.data.status, 'ONLINE');
   });
 
   test('8. Allows triggering demo scenario via /demo/trigger/:scenarioId', async () => {
@@ -163,7 +158,7 @@ describe('Telemetry API Ingestion & Authentication', () => {
     assert.equal(res.status, 201);
     const body = await res.json();
     assert.equal(body.status, 'SUCCESS');
-    assert.equal(body.assessment.treatment_level, 'HIGH');
+    assert.equal(body.assessment.treatment_level, 'LEVEL_3');
     assert.equal(body.source_mode, 'SIMULATED');
   });
 });

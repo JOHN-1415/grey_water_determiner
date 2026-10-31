@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { LineChart, BarChart2, TrendingUp } from 'lucide-react';
+import { LineChart, BarChart2, TrendingUp, Download } from 'lucide-react';
+import { dataProvider } from '../services/dataProvider';
 
 export default function HistoricalCharts({ history = [] }) {
   const [selectedMetric, setSelectedMetric] = useState('turbidity');
@@ -68,32 +69,44 @@ export default function HistoricalCharts({ history = [] }) {
           </p>
         </div>
 
-        {/* Metric Selector Tabs */}
-        <div style={{
-          display: 'flex',
-          background: 'rgba(15, 23, 42, 0.9)',
-          padding: '4px',
-          borderRadius: '8px',
-          border: '1px solid var(--border-subtle)',
-          gap: '4px'
-        }}>
+        {/* Metric Selector Tabs & CSV Export */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{
+            display: 'flex',
+            background: 'rgba(15, 23, 42, 0.9)',
+            padding: '4px',
+            borderRadius: '8px',
+            border: '1px solid var(--border-subtle)',
+            gap: '4px'
+          }}>
+            <button
+              className={`tab-pill ${selectedMetric === 'turbidity' ? 'active' : ''}`}
+              onClick={() => setSelectedMetric('turbidity')}
+            >
+              Turbidity (NTU)
+            </button>
+            <button
+              className={`tab-pill ${selectedMetric === 'tds' ? 'active' : ''}`}
+              onClick={() => setSelectedMetric('tds')}
+            >
+              TDS (ppm)
+            </button>
+            <button
+              className={`tab-pill ${selectedMetric === 'temp' ? 'active' : ''}`}
+              onClick={() => setSelectedMetric('temp')}
+            >
+              Temperature (°C)
+            </button>
+          </div>
+
           <button
-            className={`tab-pill ${selectedMetric === 'turbidity' ? 'active' : ''}`}
-            onClick={() => setSelectedMetric('turbidity')}
+            onClick={() => dataProvider.exportHistoryToCSV(history)}
+            className="btn btn-secondary"
+            title="Download Telemetry History as CSV"
+            style={{ padding: '6px 12px', fontSize: '0.75rem', gap: '6px' }}
           >
-            Turbidity (NTU)
-          </button>
-          <button
-            className={`tab-pill ${selectedMetric === 'tds' ? 'active' : ''}`}
-            onClick={() => setSelectedMetric('tds')}
-          >
-            TDS (ppm)
-          </button>
-          <button
-            className={`tab-pill ${selectedMetric === 'temp' ? 'active' : ''}`}
-            onClick={() => setSelectedMetric('temp')}
-          >
-            Temperature (°C)
+            <Download size={14} />
+            <span>CSV</span>
           </button>
         </div>
       </div>

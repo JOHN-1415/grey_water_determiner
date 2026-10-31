@@ -1,24 +1,25 @@
 /**
  * Demo Scenario Service for GreyWater Guardian
+ * IoT Greywater Quality Assessment & Recommendation System
  *
- * Implements the 10 required simulation scenarios deterministically:
- * 1. Low treatment requirement
- * 2. Medium treatment requirement
- * 3. High treatment requirement
- * 4. Missing pH sensor
- * 5. Sensor failure
- * 6. Stale readings
- * 7. Device offline
- * 8. Treatment stage error
- * 9. Post-treatment reading available
- * 10. Post-treatment reading unavailable
+ * Implements 10 realistic assessment scenarios:
+ * 1. Low Contamination (Level 1: Basic Treatment Recommendation)
+ * 2. Moderate Contamination (Level 2: Moderate Treatment Recommendation)
+ * 3. High Contamination (Level 3: Advanced Treatment Recommendation)
+ * 4. Missing pH Sensor (Matches physical prototype where probe is omitted)
+ * 5. Sensor Fault (Implausible negative TDS value triggers UNKNOWN safe hold)
+ * 6. Stale Telemetry (Telemetry timed out)
+ * 7. Device Offline (ESP32 disconnected)
+ * 8. Severe Turbidity Surge (Extreme particulate load triggers Level 3)
+ * 9. Disconnected DS18B20 Temp Probe (Probe unplugged, reported as null)
+ * 10. Thermal Context Greywater (Elevated 48°C wash water with Level 2 recommendation)
  */
 
 export const DEMO_SCENARIOS = {
   1: {
     id: 1,
-    name: 'Low Treatment Requirement (Basic)',
-    description: 'Clean wash-basin / light rinse water meeting basic standards.',
+    name: '1. Low Contamination (Level 1: Basic)',
+    description: 'Light wash basin / hand wash rinse water. Turbidity and TDS meet basic criteria.',
     payload: {
       device_id: 'GW-001',
       sequence: 101,
@@ -31,20 +32,13 @@ export const DEMO_SCENARIOS = {
         turbidity_ntu: 3.2,
         temperature_c: 24.5
       },
-      treatment: {
-        active_stage: 1,
-        stage_1: 'ACTIVE',
-        stage_2: 'BYPASSED',
-        stage_3: 'BYPASSED',
-        pump_status: 'ON'
-      },
-      output_sensors: null
+      classification: 'LEVEL_1'
     }
   },
   2: {
     id: 2,
-    name: 'Medium Treatment Requirement (Moderate)',
-    description: 'Shower / bath water with moderate soaps and turbidity.',
+    name: '2. Moderate Contamination (Level 2: Moderate)',
+    description: 'Shower and bath greywater containing moderate dissolved soaps and turbidity.',
     payload: {
       device_id: 'GW-001',
       sequence: 102,
@@ -57,20 +51,13 @@ export const DEMO_SCENARIOS = {
         turbidity_ntu: 14.8,
         temperature_c: 27.2
       },
-      treatment: {
-        active_stage: 2,
-        stage_1: 'COMPLETED',
-        stage_2: 'ACTIVE',
-        stage_3: 'BYPASSED',
-        pump_status: 'ON'
-      },
-      output_sensors: null
+      classification: 'LEVEL_2'
     }
   },
   3: {
     id: 3,
-    name: 'High Treatment Requirement (Intensive)',
-    description: 'Heavy laundry greywater with high turbidity, surfactants & TDS.',
+    name: '3. High Contamination (Level 3: Advanced)',
+    description: 'Heavy laundry wash greywater with high turbidity, surfactants, and TDS.',
     payload: {
       device_id: 'GW-001',
       sequence: 103,
@@ -83,20 +70,13 @@ export const DEMO_SCENARIOS = {
         turbidity_ntu: 38.5,
         temperature_c: 29.8
       },
-      treatment: {
-        active_stage: 3,
-        stage_1: 'COMPLETED',
-        stage_2: 'COMPLETED',
-        stage_3: 'ACTIVE',
-        pump_status: 'ON'
-      },
-      output_sensors: null
+      classification: 'LEVEL_3'
     }
   },
   4: {
     id: 4,
-    name: 'Missing pH Sensor (Optional Hardware Omitted)',
-    description: 'Matches prototype setup where pH probe is omitted from ESP32.',
+    name: '4. Missing pH Sensor (Prototype Setup)',
+    description: 'Matches physical prototype where pH probe is omitted; assesses using TDS and Turbidity.',
     payload: {
       device_id: 'GW-001',
       sequence: 104,
@@ -104,25 +84,18 @@ export const DEMO_SCENARIOS = {
       source_mode: 'SIMULATED',
       device_status: 'ONLINE',
       sensors: {
-        ph: null, // explicit null
+        ph: null,
         tds_ppm: 220.0,
         turbidity_ntu: 4.1,
         temperature_c: 25.1
       },
-      treatment: {
-        active_stage: 1,
-        stage_1: 'ACTIVE',
-        stage_2: 'BYPASSED',
-        stage_3: 'BYPASSED',
-        pump_status: 'ON'
-      },
-      output_sensors: null
+      classification: 'LEVEL_1'
     }
   },
   5: {
     id: 5,
-    name: 'Sensor Failure (Implausible / Disconnected)',
-    description: 'Broken TDS sensor reporting negative reading (-45 ppm).',
+    name: '5. Sensor Failure (Implausible TDS)',
+    description: 'Hardware probe anomaly reporting impossible negative TDS value; system enters UNKNOWN safe hold.',
     payload: {
       device_id: 'GW-001',
       sequence: 105,
@@ -131,24 +104,17 @@ export const DEMO_SCENARIOS = {
       device_status: 'SENSOR_ERROR',
       sensors: {
         ph: 7.1,
-        tds_ppm: -45.0, // Invalid implausible reading
+        tds_ppm: -45.0,
         turbidity_ntu: 12.0,
         temperature_c: 26.0
       },
-      treatment: {
-        active_stage: null,
-        stage_1: 'BYPASSED',
-        stage_2: 'BYPASSED',
-        stage_3: 'BYPASSED',
-        pump_status: 'OFF'
-      },
-      output_sensors: null
+      classification: 'UNKNOWN'
     }
   },
   6: {
     id: 6,
-    name: 'Stale Readings (Telemetry Timed Out)',
-    description: 'Telemetry received over 50 seconds ago without updates.',
+    name: '6. Stale Telemetry (Communication Delay)',
+    description: 'Telemetry older than stale threshold (>30s); flags stale state and halts recommendation.',
     payload: {
       device_id: 'GW-001',
       sequence: 106,
@@ -156,27 +122,20 @@ export const DEMO_SCENARIOS = {
       source_mode: 'SIMULATED',
       device_status: 'ONLINE',
       is_stale_simulation: true,
-      stale_offset_seconds: 75,
+      stale_offset_seconds: 80,
       sensors: {
         ph: 7.3,
         tds_ppm: 310.0,
         turbidity_ntu: 8.5,
         temperature_c: 26.4
       },
-      treatment: {
-        active_stage: 1,
-        stage_1: 'ACTIVE',
-        stage_2: 'BYPASSED',
-        stage_3: 'BYPASSED',
-        pump_status: 'ON'
-      },
-      output_sensors: null
+      classification: 'UNKNOWN'
     }
   },
   7: {
     id: 7,
-    name: 'Device Offline',
-    description: 'ESP32 controller disconnected from power or WiFi.',
+    name: '7. Device Offline',
+    description: 'ESP32 disconnected from power or USB; system marks device offline.',
     payload: {
       device_id: 'GW-001',
       sequence: 107,
@@ -190,20 +149,13 @@ export const DEMO_SCENARIOS = {
         turbidity_ntu: null,
         temperature_c: null
       },
-      treatment: {
-        active_stage: null,
-        stage_1: 'BYPASSED',
-        stage_2: 'BYPASSED',
-        stage_3: 'BYPASSED',
-        pump_status: 'OFF'
-      },
-      output_sensors: null
+      classification: 'UNKNOWN'
     }
   },
   8: {
     id: 8,
-    name: 'Treatment Stage Error (Stage Mismatch)',
-    description: 'Medium treatment recommended, but hardware reports Stage 2 Relay Error.',
+    name: '8. Severe Turbidity Surge (Heavy Particulates)',
+    description: 'Extreme turbidity (65 NTU) from floor cleaning greywater triggering Level 3.',
     payload: {
       device_id: 'GW-001',
       sequence: 108,
@@ -211,25 +163,18 @@ export const DEMO_SCENARIOS = {
       source_mode: 'SIMULATED',
       device_status: 'ONLINE',
       sensors: {
-        ph: 7.7,
-        tds_ppm: 490.0,
-        turbidity_ntu: 19.2,
-        temperature_c: 27.5
+        ph: 8.1,
+        tds_ppm: 420.0,
+        turbidity_ntu: 65.0,
+        temperature_c: 27.0
       },
-      treatment: {
-        active_stage: 1, // Controller stuck at stage 1
-        stage_1: 'ACTIVE',
-        stage_2: 'FAULT', // Valve / Relay fault reported
-        stage_3: 'BYPASSED',
-        pump_status: 'ON'
-      },
-      output_sensors: null
+      classification: 'LEVEL_3'
     }
   },
   9: {
     id: 9,
-    name: 'Post-Treatment Reading Available',
-    description: 'Dual-sensor setup: verifies filtration efficacy before non-potable reuse.',
+    name: '9. Disconnected DS18B20 Temp Probe',
+    description: 'DS18B20 temperature probe unplugged (null); system continues assessment without faking 25°C.',
     payload: {
       device_id: 'GW-001',
       sequence: 109,
@@ -237,30 +182,18 @@ export const DEMO_SCENARIOS = {
       source_mode: 'SIMULATED',
       device_status: 'ONLINE',
       sensors: {
-        ph: 7.8,
-        tds_ppm: 530.0,
-        turbidity_ntu: 19.5,
-        temperature_c: 28.2
+        ph: null,
+        tds_ppm: 260.0,
+        turbidity_ntu: 3.8,
+        temperature_c: null // Unplugged DS18B20
       },
-      output_sensors: {
-        ph: 7.2,
-        tds_ppm: 210.0,
-        turbidity_ntu: 2.4,
-        temperature_c: 26.9
-      },
-      treatment: {
-        active_stage: 2,
-        stage_1: 'COMPLETED',
-        stage_2: 'COMPLETED',
-        stage_3: 'BYPASSED',
-        pump_status: 'ON'
-      }
+      classification: 'LEVEL_1'
     }
   },
   10: {
     id: 10,
-    name: 'Post-Treatment Reading Unavailable',
-    description: 'Hardware does not have output sensors installed; output cannot be verified.',
+    name: '10. Warm Greywater Thermal Context',
+    description: 'Hot laundry/shower rinse at 48°C; recorded as contextual warmth without independently changing filtration level.',
     payload: {
       device_id: 'GW-001',
       sequence: 110,
@@ -268,38 +201,28 @@ export const DEMO_SCENARIOS = {
       source_mode: 'SIMULATED',
       device_status: 'ONLINE',
       sensors: {
-        ph: 7.1,
-        tds_ppm: 290.0,
-        turbidity_ntu: 4.8,
-        temperature_c: 25.0
+        ph: 7.7,
+        tds_ppm: 410.0,
+        turbidity_ntu: 11.2,
+        temperature_c: 48.0 // Contextual warmth
       },
-      output_sensors: null, // explicit null
-      treatment: {
-        active_stage: 1,
-        stage_1: 'COMPLETED',
-        stage_2: 'BYPASSED',
-        stage_3: 'BYPASSED',
-        pump_status: 'OFF'
-      }
+      classification: 'LEVEL_2'
     }
   }
 };
 
-/**
- * Get Scenario by ID
- */
-export function getScenario(scenarioId) {
-  const id = Number(scenarioId);
-  return DEMO_SCENARIOS[id] || DEMO_SCENARIOS[1];
-}
-
-/**
- * List all scenarios for frontend switcher
- */
 export function listScenarios() {
   return Object.values(DEMO_SCENARIOS).map((s) => ({
     id: s.id,
     name: s.name,
     description: s.description
   }));
+}
+
+export function getScenario(id) {
+  const scenario = DEMO_SCENARIOS[Number(id)];
+  if (!scenario) {
+    throw new Error(`Scenario ID '${id}' not found`);
+  }
+  return scenario;
 }

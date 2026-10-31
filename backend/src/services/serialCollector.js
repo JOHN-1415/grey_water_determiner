@@ -135,16 +135,10 @@ async function processTelemetryRecord(record) {
     uptime_seconds: data.uptime_seconds,
     received_at: new Date().toISOString(),
     sensors: data.sensors,
-    output_sensors: data.output_sensors,
+    sensor_validity: data.sensor_validity,
     device_status: data.device_status || 'ONLINE',
     source_mode: 'HARDWARE',
-    treatment: {
-      active_stage: data.treatment?.active_stage ?? 1,
-      stage_1: data.treatment?.pump_status === 'ON' ? 'ACTIVE' : 'IDLE',
-      stage_2: 'NOT_INSTALLED',
-      stage_3: 'NOT_INSTALLED',
-      pump_status: data.treatment?.pump_status || 'UNKNOWN'
-    },
+    classification: data.classification || assessment.treatment_level,
     assessment,
     raw_payload: record
   };
@@ -159,7 +153,7 @@ async function processTelemetryRecord(record) {
     `[SerialCollector] Received Telemetry #${sequence} -> ` +
     `Temp: ${data.sensors.temperature_c !== null ? data.sensors.temperature_c + '°C' : 'N/A'}, ` +
     `TDS: ${data.sensors.tds_ppm} ppm, Turbidity: ${data.sensors.turbidity_ntu} NTU, ` +
-    `Class: ${assessment.treatment_level}, Pump: ${recordToSave.treatment.pump_status}`
+    `Class: ${assessment.treatment_level} (${assessment.recommendation?.title || 'Evaluated'})`
   );
 
   return true;

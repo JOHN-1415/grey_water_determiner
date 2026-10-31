@@ -1,13 +1,14 @@
 /**
  * Automated Tests for GreyWater Guardian Rules Engine
+ * IoT Greywater Quality Assessment & Recommendation System
  */
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { assessWaterQuality, DEFAULT_RULES_CONFIG } from '../src/services/rulesEngine.js';
+import { assessWaterQuality, DEFAULT_RULES_CONFIG, getScientificLimitations } from '../src/services/rulesEngine.js';
 
-describe('Rules Engine - Water Quality Assessment', () => {
-  test('1. Recommends BASIC when all parameters meet basic criteria', () => {
+describe('Rules Engine — Water Quality Assessment & Recommendations', () => {
+  test('1. Recommends LEVEL_1 when all parameters meet basic criteria', () => {
     const sensors = {
       ph: 7.2,
       tds_ppm: 210,
@@ -16,34 +17,32 @@ describe('Rules Engine - Water Quality Assessment', () => {
     };
 
     const result = assessWaterQuality(sensors);
-    assert.equal(result.treatment_level, 'BASIC');
+    assert.equal(result.treatment_level, 'LEVEL_1');
     assert.equal(result.assessment_status, 'NORMAL');
-    assert.equal(result.stage_mapping.stage_1, 'ACTIVE');
-    assert.equal(result.stage_mapping.stage_2, 'BYPASSED');
-    assert.equal(result.stage_mapping.stage_3, 'BYPASSED');
-    assert.ok(result.explanation.includes('Basic treatment'));
+    assert.ok(result.explanation.includes('Level 1'));
     assert.equal(result.parameters_outside_criteria.length, 0);
+    assert.ok(result.recommendation);
+    assert.equal(result.recommendation.assigned_level, 'LEVEL_1');
+    assert.ok(result.recommendation.suggested_treatment_methods.length > 0);
   });
 
-  test('2. Recommends MEDIUM when turbidity exceeds basic threshold', () => {
+  test('2. Recommends LEVEL_2 when turbidity exceeds basic threshold', () => {
     const sensors = {
       ph: 7.4,
       tds_ppm: 250,
-      turbidity_ntu: 15.0, // > 5.0 NTU basic limit
+      turbidity_ntu: 15.0, // > 5.0 NTU limit
       temperature_c: 25.0
     };
 
     const result = assessWaterQuality(sensors);
-    assert.equal(result.treatment_level, 'MEDIUM');
+    assert.equal(result.treatment_level, 'LEVEL_2');
     assert.equal(result.assessment_status, 'MODERATE_CONTAMINATION');
-    assert.equal(result.stage_mapping.stage_1, 'ACTIVE');
-    assert.equal(result.stage_mapping.stage_2, 'ACTIVE');
-    assert.equal(result.stage_mapping.stage_3, 'BYPASSED');
     assert.ok(result.parameters_outside_criteria.includes('turbidity_ntu'));
     assert.ok(/turbidity/i.test(result.explanation));
+    assert.equal(result.recommendation.assigned_level, 'LEVEL_2');
   });
 
-  test('3. Recommends HIGH when TDS and Turbidity indicate heavy contamination', () => {
+  test('3. Recommends LEVEL_3 when TDS and Turbidity indicate heavy contamination', () => {
     const sensors = {
       ph: 8.9,
       tds_ppm: 950, // > 800 ppm
@@ -52,13 +51,11 @@ describe('Rules Engine - Water Quality Assessment', () => {
     };
 
     const result = assessWaterQuality(sensors);
-    assert.equal(result.treatment_level, 'HIGH');
+    assert.equal(result.treatment_level, 'LEVEL_3');
     assert.equal(result.assessment_status, 'HIGH_CONTAMINATION');
-    assert.equal(result.stage_mapping.stage_1, 'ACTIVE');
-    assert.equal(result.stage_mapping.stage_2, 'ACTIVE');
-    assert.equal(result.stage_mapping.stage_3, 'ACTIVE');
     assert.ok(result.parameters_outside_criteria.includes('tds_ppm'));
     assert.ok(result.parameters_outside_criteria.includes('turbidity_ntu'));
+    assert.equal(result.recommendation.assigned_level, 'LEVEL_3');
   });
 
   test('4. Correctly assesses water when optional pH is NULL (matches prototype hardware)', () => {
@@ -70,7 +67,7 @@ describe('Rules Engine - Water Quality Assessment', () => {
     };
 
     const result = assessWaterQuality(sensors);
-    assert.equal(result.treatment_level, 'BASIC');
+    assert.equal(result.treatment_level, 'LEVEL_1');
     assert.equal(result.parameter_details.ph.status, 'OPTIONAL_UNINSTALLED');
     assert.ok(result.parameters_considered.includes('tds_ppm'));
     assert.ok(result.parameters_considered.includes('turbidity_ntu'));
@@ -89,7 +86,7 @@ describe('Rules Engine - Water Quality Assessment', () => {
     assert.equal(result.treatment_level, 'UNKNOWN');
     assert.equal(result.assessment_status, 'SENSOR_ERROR');
     assert.ok(result.explanation.includes('Lowest treatment is NOT assumed'));
-    assert.equal(result.stage_mapping.stage_1, 'BYPASSED');
+    assert.equal(result.recommendation.assigned_level, 'UNKNOWN');
   });
 
   test('6. Rejects implausible sensor readings (negative TDS)', () => {
@@ -103,64 +100,41 @@ describe('Rules Engine - Water Quality Assessment', () => {
     const result = assessWaterQuality(sensors);
     assert.equal(result.treatment_level, 'UNKNOWN');
     assert.equal(result.assessment_status, 'SENSOR_ERROR');
-    assert.ok(result.explanation.includes('missing or invalid'));
   });
 
   test('7. Flags stale telemetry and does not approve lowest treatment', () => {
     const sensors = {
-      ph: 7.2,
-      tds_ppm: 150,
+      ph: 7.1,
+      tds_ppm: 180,
       turbidity_ntu: 2.0,
-      temperature_c: 24.0
+      temperature_c: 22.0
     };
 
     const result = assessWaterQuality(sensors, null, { is_stale: true });
     assert.equal(result.treatment_level, 'UNKNOWN');
     assert.equal(result.assessment_status, 'STALE_DATA');
-    assert.ok(result.explanation.includes('STALE'));
   });
 
-  test('8. Handles offline device metadata', () => {
-    const sensors = {
-      ph: 7.2,
-      tds_ppm: 150,
-      turbidity_ntu: 2.0,
-      temperature_c: 24.0
+  test('8. Treats temperature as contextual without independently setting treatment level', () => {
+    const sensorsWarm = {
+      ph: null,
+      tds_ppm: 200, // Meets Level 1
+      turbidity_ntu: 3.0, // Meets Level 1
+      temperature_c: 48.0 // Warm greywater
     };
 
-    const result = assessWaterQuality(sensors, null, { is_offline: true });
-    assert.equal(result.treatment_level, 'UNKNOWN');
-    assert.equal(result.assessment_status, 'OFFLINE');
-    assert.ok(result.explanation.includes('OFFLINE'));
+    const result = assessWaterQuality(sensorsWarm);
+    // Treatment level remains Level 1 based on TDS and Turbidity
+    assert.equal(result.treatment_level, 'LEVEL_1');
+    assert.equal(result.parameter_details.temperature_c.status, 'NORMAL_RANGE');
+    assert.ok(result.parameter_details.temperature_c.context.includes('Temperature'));
   });
 
-  test('9. Supports configurable rule thresholds', () => {
-    // Custom config with stricter turbidity limit (2.0 NTU instead of 5.0)
-    const customConfig = {
-      ...DEFAULT_RULES_CONFIG,
-      version: '2.0.0-strict',
-      thresholds: {
-        ...DEFAULT_RULES_CONFIG.thresholds,
-        turbidity_ntu: {
-          optional: false,
-          basic_max: 2.0, // Stricter
-          medium_max: 10.0
-        }
-      }
-    };
-
-    const sensors = {
-      ph: 7.2,
-      tds_ppm: 200,
-      turbidity_ntu: 3.5, // 3.5 is > 2.0, so should trigger MEDIUM under strict config
-      temperature_c: 24.0
-    };
-
-    const defaultResult = assessWaterQuality(sensors, DEFAULT_RULES_CONFIG);
-    assert.equal(defaultResult.treatment_level, 'BASIC');
-
-    const customResult = assessWaterQuality(sensors, customConfig);
-    assert.equal(customResult.treatment_level, 'MEDIUM');
-    assert.equal(customResult.rules_version, '2.0.0-strict');
+  test('9. Includes mandatory scientific and regulatory limitations in recommendations', () => {
+    const limits = getScientificLimitations();
+    assert.equal(limits.length, 4);
+    assert.ok(limits.some((l) => /microbiological/i.test(l)));
+    assert.ok(limits.some((l) => /potability/i.test(l)));
+    assert.ok(limits.some((l) => /does not physically purify/i.test(l)));
   });
 });

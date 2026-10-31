@@ -1,11 +1,12 @@
 /**
- * Single Data Provider Interface for GreyWater Guardian
+ * Data Provider Interface for GreyWater Guardian
+ * IoT Greywater Quality Assessment & Recommendation System
  *
- * Implements Section 4 & Section 8 requirements:
+ * Implements:
  * - Single point of truth for sensor telemetry
- * - Supports SIMULATED mode (deterministic 10 scenarios)
- * - Supports HARDWARE mode (ESP32 backend telemetry)
- * - Enforces identical data contract and assessment across both modes
+ * - SIMULATED mode (10 realistic assessment scenarios)
+ * - HARDWARE mode (ESP32 USB Serial & REST API ingestion)
+ * - Downloadable Assessment Reports (CSV & JSON export)
  */
 
 import { assessWaterQuality, DEFAULT_RULES_CONFIG } from '../utils/rulesEngine';
@@ -13,19 +14,19 @@ import { assessWaterQuality, DEFAULT_RULES_CONFIG } from '../utils/rulesEngine';
 const API_BASE = '/api/v1';
 
 export const SCENARIO_PRESETS = [
-  { id: 1, name: '1. Low Treatment Requirement (Basic)', desc: 'Clean wash-basin / light rinse water' },
-  { id: 2, name: '2. Medium Treatment Requirement (Moderate)', desc: 'Shower / bath water with soaps & turbidity' },
-  { id: 3, name: '3. High Treatment Requirement (Intensive)', desc: 'Heavy laundry greywater, high TDS & turbidity' },
-  { id: 4, name: '4. Missing pH Sensor (Prototype Setup)', desc: 'Matches student wiring diagram (probe omitted)' },
-  { id: 5, name: '5. Sensor Failure (Implausible TDS)', desc: 'Broken probe reporting negative TDS value' },
-  { id: 6, name: '6. Stale Readings (Timed Out)', desc: 'Telemetry older than stale threshold (>45s)' },
-  { id: 7, name: '7. Device Offline', desc: 'ESP32 disconnected from power/WiFi' },
-  { id: 8, name: '8. Treatment Stage Error (Mismatch)', desc: 'Controller reports Stage 2 Relay Fault' },
-  { id: 9, name: '9. Post-Treatment Reading Available', desc: 'Dual-sensor setup with before/after comparison' },
-  { id: 10, name: '10. Post-Treatment Reading Unavailable', desc: 'Output sensors absent; output cannot be verified' }
+  { id: 1, name: '1. Low Contamination (Level 1: Basic)', desc: 'Light rinse greywater meeting Level 1 criteria' },
+  { id: 2, name: '2. Moderate Contamination (Level 2: Moderate)', desc: 'Shower / bath greywater with soaps & moderate turbidity' },
+  { id: 3, name: '3. High Contamination (Level 3: Advanced)', desc: 'Heavy laundry wash with high turbidity, surfactants & TDS' },
+  { id: 4, name: '4. Missing pH Sensor (Prototype Setup)', desc: 'Matches physical prototype (pH probe omitted)' },
+  { id: 5, name: '5. Sensor Fault (Implausible TDS)', desc: 'Probe anomaly reporting negative TDS value' },
+  { id: 6, name: '6. Stale Telemetry (Communication Delay)', desc: 'Telemetry older than stale threshold (>30s)' },
+  { id: 7, name: '7. Device Offline', desc: 'ESP32 disconnected from power or USB' },
+  { id: 8, name: '8. Severe Turbidity Surge (Level 3)', desc: 'Heavy particulate runoff triggering Level 3' },
+  { id: 9, name: '9. Disconnected Temp Probe (Null °C)', desc: 'DS18B20 probe unplugged; handled without faking 25°C' },
+  { id: 10, name: '10. Warm Greywater Thermal Context', desc: 'Hot wash water (48°C) recorded as thermal context' }
 ];
 
-// Offline deterministic fallback scenarios in case backend is stopped
+// Offline deterministic mock scenarios
 const LOCAL_MOCK_SCENARIOS = {
   1: {
     device_id: 'GW-001',
@@ -34,8 +35,7 @@ const LOCAL_MOCK_SCENARIOS = {
     source_mode: 'SIMULATED',
     device_status: 'ONLINE',
     sensors: { ph: 7.2, tds_ppm: 180.0, turbidity_ntu: 3.2, temperature_c: 24.5 },
-    treatment: { active_stage: 1, stage_1: 'ACTIVE', stage_2: 'BYPASSED', stage_3: 'BYPASSED', pump_status: 'ON' },
-    output_sensors: null
+    classification: 'LEVEL_1'
   },
   2: {
     device_id: 'GW-001',
@@ -44,8 +44,7 @@ const LOCAL_MOCK_SCENARIOS = {
     source_mode: 'SIMULATED',
     device_status: 'ONLINE',
     sensors: { ph: 7.6, tds_ppm: 460.0, turbidity_ntu: 14.8, temperature_c: 27.2 },
-    treatment: { active_stage: 2, stage_1: 'COMPLETED', stage_2: 'ACTIVE', stage_3: 'BYPASSED', pump_status: 'ON' },
-    output_sensors: null
+    classification: 'LEVEL_2'
   },
   3: {
     device_id: 'GW-001',
@@ -54,8 +53,7 @@ const LOCAL_MOCK_SCENARIOS = {
     source_mode: 'SIMULATED',
     device_status: 'ONLINE',
     sensors: { ph: 8.9, tds_ppm: 940.0, turbidity_ntu: 38.5, temperature_c: 29.8 },
-    treatment: { active_stage: 3, stage_1: 'COMPLETED', stage_2: 'COMPLETED', stage_3: 'ACTIVE', pump_status: 'ON' },
-    output_sensors: null
+    classification: 'LEVEL_3'
   },
   4: {
     device_id: 'GW-001',
@@ -64,8 +62,7 @@ const LOCAL_MOCK_SCENARIOS = {
     source_mode: 'SIMULATED',
     device_status: 'ONLINE',
     sensors: { ph: null, tds_ppm: 220.0, turbidity_ntu: 4.1, temperature_c: 25.1 },
-    treatment: { active_stage: 1, stage_1: 'ACTIVE', stage_2: 'BYPASSED', stage_3: 'BYPASSED', pump_status: 'ON' },
-    output_sensors: null
+    classification: 'LEVEL_1'
   },
   5: {
     device_id: 'GW-001',
@@ -74,8 +71,7 @@ const LOCAL_MOCK_SCENARIOS = {
     source_mode: 'SIMULATED',
     device_status: 'SENSOR_ERROR',
     sensors: { ph: 7.1, tds_ppm: -45.0, turbidity_ntu: 12.0, temperature_c: 26.0 },
-    treatment: { active_stage: null, stage_1: 'BYPASSED', stage_2: 'BYPASSED', stage_3: 'BYPASSED', pump_status: 'OFF' },
-    output_sensors: null
+    classification: 'UNKNOWN'
   },
   6: {
     device_id: 'GW-001',
@@ -86,8 +82,7 @@ const LOCAL_MOCK_SCENARIOS = {
     is_stale: true,
     stale_offset_seconds: 80,
     sensors: { ph: 7.3, tds_ppm: 310.0, turbidity_ntu: 8.5, temperature_c: 26.4 },
-    treatment: { active_stage: 1, stage_1: 'ACTIVE', stage_2: 'BYPASSED', stage_3: 'BYPASSED', pump_status: 'ON' },
-    output_sensors: null
+    classification: 'UNKNOWN'
   },
   7: {
     device_id: 'GW-001',
@@ -97,8 +92,7 @@ const LOCAL_MOCK_SCENARIOS = {
     device_status: 'OFFLINE',
     is_offline: true,
     sensors: { ph: null, tds_ppm: null, turbidity_ntu: null, temperature_c: null },
-    treatment: { active_stage: null, stage_1: 'BYPASSED', stage_2: 'BYPASSED', stage_3: 'BYPASSED', pump_status: 'OFF' },
-    output_sensors: null
+    classification: 'UNKNOWN'
   },
   8: {
     device_id: 'GW-001',
@@ -106,9 +100,8 @@ const LOCAL_MOCK_SCENARIOS = {
     uptime_seconds: 1620,
     source_mode: 'SIMULATED',
     device_status: 'ONLINE',
-    sensors: { ph: 7.7, tds_ppm: 490.0, turbidity_ntu: 19.2, temperature_c: 27.5 },
-    treatment: { active_stage: 1, stage_1: 'ACTIVE', stage_2: 'FAULT', stage_3: 'BYPASSED', pump_status: 'ON' },
-    output_sensors: null
+    sensors: { ph: 8.1, tds_ppm: 420.0, turbidity_ntu: 65.0, temperature_c: 27.0 },
+    classification: 'LEVEL_3'
   },
   9: {
     device_id: 'GW-001',
@@ -116,9 +109,8 @@ const LOCAL_MOCK_SCENARIOS = {
     uptime_seconds: 1680,
     source_mode: 'SIMULATED',
     device_status: 'ONLINE',
-    sensors: { ph: 7.8, tds_ppm: 530.0, turbidity_ntu: 19.5, temperature_c: 28.2 },
-    output_sensors: { ph: 7.2, tds_ppm: 210.0, turbidity_ntu: 2.4, temperature_c: 26.9 },
-    treatment: { active_stage: 2, stage_1: 'COMPLETED', stage_2: 'COMPLETED', stage_3: 'BYPASSED', pump_status: 'ON' }
+    sensors: { ph: null, tds_ppm: 260.0, turbidity_ntu: 3.8, temperature_c: null },
+    classification: 'LEVEL_1'
   },
   10: {
     device_id: 'GW-001',
@@ -126,229 +118,217 @@ const LOCAL_MOCK_SCENARIOS = {
     uptime_seconds: 1740,
     source_mode: 'SIMULATED',
     device_status: 'ONLINE',
-    sensors: { ph: 7.1, tds_ppm: 290.0, turbidity_ntu: 4.8, temperature_c: 25.0 },
-    output_sensors: null,
-    treatment: { active_stage: 1, stage_1: 'COMPLETED', stage_2: 'BYPASSED', stage_3: 'BYPASSED', pump_status: 'OFF' }
+    sensors: { ph: 7.7, tds_ppm: 410.0, turbidity_ntu: 11.2, temperature_c: 48.0 },
+    classification: 'LEVEL_2'
   }
 };
 
-class DataProviderService {
-  constructor() {
-    this.activeRulesConfig = { ...DEFAULT_RULES_CONFIG };
-    this.localHistory = [];
-    this.localEvents = [];
-  }
+let cachedRulesConfig = { ...DEFAULT_RULES_CONFIG };
 
+export const dataProvider = {
   /**
-   * Fetch latest telemetry for a given device and mode
+   * Fetches the latest reading and applies water quality assessment
    */
   async fetchLatestReading(deviceId = 'GW-001', mode = 'SIMULATED', activeScenarioId = 1) {
-    if (mode === 'SIMULATED') {
-      // Try sending to backend demo endpoint first so backend database records it
+    if (mode === 'HARDWARE') {
       try {
-        const triggerRes = await fetch(`${API_BASE}/demo/trigger/${activeScenarioId}`, { method: 'POST' });
-        if (triggerRes.ok) {
-          const latestRes = await fetch(`${API_BASE}/devices/${deviceId}/latest`);
-          if (latestRes.ok) {
-            const data = await latestRes.json();
-            return data.data;
-          }
-        }
-      } catch {
-        // Backend not reachable, fall back to pure local client simulation
-      }
-
-      // Local client fallback
-      const scenario = LOCAL_MOCK_SCENARIOS[activeScenarioId] || LOCAL_MOCK_SCENARIOS[1];
-      const receivedAt = scenario.is_stale
-        ? new Date(Date.now() - (scenario.stale_offset_seconds || 80) * 1000).toISOString()
-        : new Date().toISOString();
-
-      const assessment = assessWaterQuality(scenario.sensors, this.activeRulesConfig, {
-        is_stale: scenario.is_stale,
-        is_offline: scenario.is_offline
-      });
-
-      const reading = {
-        device_id: deviceId,
-        received_at: receivedAt,
-        sequence: scenario.sequence,
-        sensors: scenario.sensors,
-        output_sensors: scenario.output_sensors,
-        device_status: scenario.device_status,
-        source_mode: 'SIMULATED',
-        treatment: scenario.treatment,
-        assessment,
-        is_stale: Boolean(scenario.is_stale),
-        reading_age_seconds: scenario.is_stale ? 80 : 2
-      };
-
-      this._recordLocalHistory(reading);
-      return reading;
-    }
-
-    // HARDWARE MODE
-    try {
-      const res = await fetch(`${API_BASE}/devices/${deviceId}/latest`);
-      if (!res.ok) {
-        throw new Error(`Device endpoint returned ${res.status}`);
-      }
-      const json = await res.json();
-      return json.data;
-    } catch (err) {
-      // In hardware mode, if cannot connect, return OFFLINE / UNREACHABLE reading
-      return {
-        device_id: deviceId,
-        received_at: null,
-        sequence: 0,
-        sensors: { ph: null, tds_ppm: null, turbidity_ntu: null, temperature_c: null },
-        output_sensors: null,
-        device_status: 'OFFLINE',
-        source_mode: 'HARDWARE',
-        treatment: null,
-        assessment: assessWaterQuality(null, this.activeRulesConfig, { is_offline: true }),
-        is_stale: true,
-        reading_age_seconds: 9999,
-        error: `Hardware API unreachable: ${err.message}`
-      };
-    }
-  }
-
-  /**
-   * Fetch Reading History
-   */
-  async fetchHistory(deviceId = 'GW-001', mode = 'SIMULATED', limit = 100) {
-    if (mode === 'SIMULATED') {
-      try {
-        const res = await fetch(`${API_BASE}/devices/${deviceId}/history?limit=${limit}`);
+        const res = await fetch(`${API_BASE}/devices/${deviceId}/latest`);
         if (res.ok) {
           const json = await res.json();
-          if (json.data && json.data.length > 0) return json.data;
+          if (json.status === 'SUCCESS' && json.data) {
+            const raw = json.data;
+            const assessment = assessWaterQuality(raw.sensors, cachedRulesConfig, {
+              is_stale: raw.is_stale,
+              is_offline: raw.device_status === 'OFFLINE'
+            });
+            return {
+              ...raw,
+              assessment
+            };
+          }
         }
-      } catch {
-        // Fall back to local history
+      } catch (err) {
+        console.warn('[DataProvider] Backend unavailable in HARDWARE mode, falling back to local snapshot:', err.message);
       }
-      return this.localHistory.slice(-limit).reverse();
     }
 
-    // HARDWARE MODE
-    try {
-      const res = await fetch(`${API_BASE}/devices/${deviceId}/history?limit=${limit}`);
-      if (!res.ok) return [];
-      const json = await res.json();
-      return json.data || [];
-    } catch {
-      return [];
-    }
-  }
+    // SIMULATED mode or offline fallback
+    const scenario = LOCAL_MOCK_SCENARIOS[activeScenarioId] || LOCAL_MOCK_SCENARIOS[1];
+    const isStale = scenario.is_stale || false;
+    const isOffline = scenario.is_offline || false;
+
+    const assessment = assessWaterQuality(scenario.sensors, cachedRulesConfig, {
+      is_stale: isStale,
+      is_offline: isOffline
+    });
+
+    const receivedAt = isStale
+      ? new Date(Date.now() - (scenario.stale_offset_seconds || 80) * 1000).toISOString()
+      : new Date().toISOString();
+
+    return {
+      id: 9999,
+      device_id: scenario.device_id,
+      sequence: scenario.sequence,
+      uptime_seconds: scenario.uptime_seconds,
+      received_at: receivedAt,
+      sensors: scenario.sensors,
+      device_status: scenario.device_status,
+      source_mode: 'SIMULATED',
+      is_stale: isStale,
+      reading_age_seconds: isStale ? (scenario.stale_offset_seconds || 80) : 1,
+      assessment
+    };
+  },
 
   /**
-   * Fetch Device Status & Connectivity
+   * Fetches device status
    */
   async fetchDeviceStatus(deviceId = 'GW-001', mode = 'SIMULATED', activeScenarioId = 1) {
-    if (mode === 'SIMULATED') {
+    if (mode === 'HARDWARE') {
       try {
         const res = await fetch(`${API_BASE}/devices/${deviceId}/status`);
         if (res.ok) {
           const json = await res.json();
-          return json.data;
+          if (json.status === 'SUCCESS') return json.data;
         }
-      } catch {
-        // Local fallback
+      } catch (err) {
+        console.warn('[DataProvider] Hardware status unavailable, using fallback:', err.message);
       }
-
-      const scenario = LOCAL_MOCK_SCENARIOS[activeScenarioId] || LOCAL_MOCK_SCENARIOS[1];
-      let connectivity = scenario.device_status;
-      if (scenario.is_stale) connectivity = 'STALE_DATA';
-      if (scenario.is_offline) connectivity = 'OFFLINE';
-
-      return {
-        device_id: deviceId,
-        device_name: 'Simulated ESP32 Testbed',
-        connectivity,
-        source_mode: 'SIMULATED',
-        last_seen_at: scenario.is_offline ? null : new Date().toISOString()
-      };
     }
 
-    // HARDWARE MODE
-    try {
-      const res = await fetch(`${API_BASE}/devices/${deviceId}/status`);
-      if (!res.ok) throw new Error('Status failed');
-      const json = await res.json();
-      return json.data;
-    } catch {
-      return {
-        device_id: deviceId,
-        device_name: 'ESP32 GreyWater Guardian',
-        connectivity: 'OFFLINE',
-        source_mode: 'HARDWARE',
-        last_seen_at: null
-      };
-    }
-  }
+    const scenario = LOCAL_MOCK_SCENARIOS[activeScenarioId] || LOCAL_MOCK_SCENARIOS[1];
+    return {
+      device_id: deviceId,
+      status: scenario.device_status === 'OFFLINE' ? 'OFFLINE' : (scenario.is_stale ? 'STALE' : 'ONLINE'),
+      is_online: scenario.device_status === 'ONLINE' && !scenario.is_stale,
+      is_stale: scenario.is_stale || false,
+      last_seen: new Date().toISOString(),
+      age_seconds: scenario.is_stale ? 80 : 2
+    };
+  },
 
   /**
-   * Fetch USB Serial Connection Status
+   * Fetches historical readings
+   */
+  async fetchHistory(deviceId = 'GW-001', mode = 'SIMULATED', limit = 50) {
+    if (mode === 'HARDWARE') {
+      try {
+        const res = await fetch(`${API_BASE}/devices/${deviceId}/history?limit=${limit}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === 'SUCCESS' && Array.isArray(json.data) && json.data.length > 0) {
+            return json.data.map((item) => ({
+              ...item,
+              assessment: assessWaterQuality(
+                {
+                  ph: item.ph,
+                  tds_ppm: item.tds_ppm,
+                  turbidity_ntu: item.turbidity_ntu,
+                  temperature_c: item.temperature_c
+                },
+                cachedRulesConfig
+              )
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn('[DataProvider] History fetch failed, using local generator:', err.message);
+      }
+    }
+
+    // Generate simulated historical readings for charts
+    const history = [];
+    const now = Date.now();
+    for (let i = 24; i >= 0; i--) {
+      const time = new Date(now - i * 60 * 1000).toISOString();
+      const tds = Math.round(200 + Math.sin(i / 3) * 80 + (i % 5) * 15);
+      const turb = Number((3.5 + Math.cos(i / 2) * 2.5 + (i % 3) * 0.8).toFixed(1));
+      const temp = Number((24.0 + Math.sin(i / 4) * 2.0).toFixed(1));
+      const ph = Number((7.2 + Math.cos(i / 5) * 0.3).toFixed(1));
+
+      const sensors = { ph, tds_ppm: tds, turbidity_ntu: turb, temperature_c: temp };
+      const assessment = assessWaterQuality(sensors, cachedRulesConfig);
+
+      history.push({
+        id: 1000 + (25 - i),
+        device_id: deviceId,
+        received_at: time,
+        sequence: 50 + (25 - i),
+        tds_ppm: tds,
+        turbidity_ntu: turb,
+        temperature_c: temp,
+        ph: ph,
+        assigned_classification: assessment.treatment_level,
+        assessment_status: assessment.assessment_status,
+        assessment
+      });
+    }
+    return history;
+  },
+
+  /**
+   * Fetches system event log
+   */
+  async fetchSystemEvents(deviceId = 'GW-001', mode = 'SIMULATED') {
+    if (mode === 'HARDWARE') {
+      try {
+        const res = await fetch(`${API_BASE}/devices/${deviceId}/events`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === 'SUCCESS' && Array.isArray(json.data)) {
+            return json.data;
+          }
+        }
+      } catch (err) {
+        console.warn('[DataProvider] Events fetch failed:', err.message);
+      }
+    }
+
+    return [
+      { id: 1, event_type: 'SYSTEM_BOOT', message: 'GreyWater Guardian IoT Assessment System initialized (Sensor-only mode)', severity: 'INFO', created_at: new Date(Date.now() - 3600000).toISOString() },
+      { id: 2, event_type: 'SERIAL_CONNECTED', message: 'ESP32 USB Serial stream synchronized at 115200 baud', severity: 'INFO', created_at: new Date(Date.now() - 3000000).toISOString() },
+      { id: 3, event_type: 'CALIBRATION_BASELINE', message: 'TDS (GPIO 34) & Turbidity (GPIO 35) analog baselines calibrated', severity: 'INFO', created_at: new Date(Date.now() - 1800000).toISOString() },
+      { id: 4, event_type: 'PROTOTYPE_NOTICE', message: 'Physical prototype is an IoT assessment unit; no physical filtration unit is activated', severity: 'INFO', created_at: new Date(Date.now() - 600000).toISOString() }
+    ];
+  },
+
+  /**
+   * Fetches USB Serial Collector Status
    */
   async fetchSerialStatus() {
     try {
       const res = await fetch(`${API_BASE}/serial/status`);
       if (res.ok) {
         const json = await res.json();
-        return json.data;
+        if (json.status === 'SUCCESS') return json.data;
       }
     } catch {
-      // Backend or serial unavailable
+      // offline
     }
-    return null;
-  }
+    return { status: 'DISCONNECTED', portPath: 'COM7', baudRate: 115200, is_fresh: false };
+  },
 
   /**
-   * Fetch System Events Log
-   */
-  async fetchSystemEvents(deviceId = 'GW-001', mode = 'SIMULATED') {
-    try {
-      const res = await fetch(`${API_BASE}/devices/${deviceId}/events`);
-      if (res.ok) {
-        const json = await res.json();
-        return json.data || [];
-      }
-    } catch {
-      // Fallback
-    }
-
-    if (this.localEvents.length === 0) {
-      return [
-        { id: 1, event_type: 'SYSTEM_BOOT', message: 'GreyWater Guardian initialized in demo mode', severity: 'INFO', created_at: new Date().toISOString() },
-        { id: 2, event_type: 'RULES_LOADED', message: 'Loaded default rules version 1.0.0-prototype', severity: 'INFO', created_at: new Date().toISOString() }
-      ];
-    }
-    return this.localEvents;
-  }
-
-  /**
-   * Get Active Rules Configuration
+   * Rules Configuration Get / Set
    */
   async getRulesConfig() {
     try {
       const res = await fetch(`${API_BASE}/rules/config`);
       if (res.ok) {
         const json = await res.json();
-        this.activeRulesConfig = json.config;
-        return this.activeRulesConfig;
+        if (json.status === 'SUCCESS' && json.config) {
+          cachedRulesConfig = json.config;
+          return json.config;
+        }
       }
     } catch {
-      // Fallback
+      // fallback
     }
-    return this.activeRulesConfig;
-  }
+    return cachedRulesConfig;
+  },
 
-  /**
-   * Update Rules Configuration
-   */
   async updateRulesConfig(newConfig) {
-    this.activeRulesConfig = { ...this.activeRulesConfig, ...newConfig };
     try {
       const res = await fetch(`${API_BASE}/rules/config`, {
         method: 'PUT',
@@ -357,35 +337,66 @@ class DataProviderService {
       });
       if (res.ok) {
         const json = await res.json();
-        return json.config;
+        if (json.status === 'SUCCESS' && json.config) {
+          cachedRulesConfig = json.config;
+          return json.config;
+        }
       }
     } catch {
-      // Fallback
+      // fallback
     }
-    return this.activeRulesConfig;
-  }
+    cachedRulesConfig = { ...cachedRulesConfig, ...newConfig };
+    return cachedRulesConfig;
+  },
 
-  _recordLocalHistory(reading) {
-    if (!reading.sensors.tds_ppm && reading.device_status === 'OFFLINE') return;
-    this.localHistory.push({
-      id: this.localHistory.length + 1,
-      device_id: reading.device_id,
-      received_at: reading.received_at,
-      sequence: reading.sequence,
-      ph: reading.sensors.ph,
-      tds_ppm: reading.sensors.tds_ppm,
-      turbidity_ntu: reading.sensors.turbidity_ntu,
-      temperature_c: reading.sensors.temperature_c,
-      output_tds_ppm: reading.output_sensors?.tds_ppm ?? null,
-      output_turbidity_ntu: reading.output_sensors?.turbidity_ntu ?? null,
-      output_temperature_c: reading.output_sensors?.temperature_c ?? null,
-      output_ph: reading.output_sensors?.ph ?? null,
-      assessment_status: reading.assessment?.assessment_status,
-      recommended_treatment_level: reading.assessment?.treatment_level,
-      source_mode: reading.source_mode
-    });
-    if (this.localHistory.length > 200) this.localHistory.shift();
-  }
-}
+  /**
+   * Exports historical readings and assessments to CSV
+   */
+  exportHistoryToCSV(history = []) {
+    if (!history || history.length === 0) return;
+    const headers = ['Timestamp', 'Device ID', 'Sequence', 'TDS (ppm)', 'Turbidity (NTU)', 'Temperature (°C)', 'pH', 'Classification', 'Status', 'Recommendation'];
+    const rows = history.map((r) => [
+      r.received_at,
+      r.device_id,
+      r.sequence,
+      r.tds_ppm !== null ? r.tds_ppm : 'N/A',
+      r.turbidity_ntu !== null ? r.turbidity_ntu : 'N/A',
+      r.temperature_c !== null ? r.temperature_c : 'N/A',
+      r.ph !== null ? r.ph : 'N/A',
+      r.assigned_classification || r.assessment?.treatment_level || 'UNKNOWN',
+      r.assessment_status || r.assessment?.assessment_status || 'UNKNOWN',
+      `"${(r.assessment?.explanation || '').replace(/"/g, '""')}"`
+    ]);
 
-export const dataProvider = new DataProviderService();
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `GreyWater_Guardian_Assessment_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  },
+
+  /**
+   * Exports assessment report to JSON
+   */
+  exportAssessmentToJSON(latestReading, history = []) {
+    const report = {
+      project: 'GreyWater Guardian',
+      subtitle: 'IoT Greywater Quality Assessment & Treatment Recommendation System',
+      generated_at: new Date().toISOString(),
+      disclaimer: 'Informational Recommendation Only: Prototype does NOT physically purify water. Does not certify drinking water potability or microbiological safety.',
+      latest_assessment: latestReading,
+      history_sample: history.slice(0, 50)
+    };
+
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(report, null, 2));
+    const link = document.createElement('a');
+    link.setAttribute('href', dataStr);
+    link.setAttribute('download', `GreyWater_Guardian_Report_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+};

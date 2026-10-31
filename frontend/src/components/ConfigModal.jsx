@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sliders, Save, RotateCcw } from 'lucide-react';
+import { X, Sliders, Save, RotateCcw, AlertTriangle } from 'lucide-react';
 import { DEFAULT_RULES_CONFIG } from '../utils/rulesEngine';
 
 export default function ConfigModal({
@@ -13,11 +13,11 @@ export default function ConfigModal({
   if (!isOpen) return null;
 
   const [form, setForm] = useState({
-    version: config?.version || '1.0.0-custom',
-    turbidity_basic_max: config?.thresholds?.turbidity_ntu?.basic_max ?? 5.0,
-    turbidity_medium_max: config?.thresholds?.turbidity_ntu?.medium_max ?? 25.0,
-    tds_basic_max: config?.thresholds?.tds_ppm?.basic_max ?? 300,
-    tds_medium_max: config?.thresholds?.tds_ppm?.medium_max ?? 800,
+    version: config?.version || '2.0.0-custom',
+    turbidity_level1_max: config?.thresholds?.turbidity_ntu?.level_1_max ?? config?.thresholds?.turbidity_ntu?.basic_max ?? 5.0,
+    turbidity_level2_max: config?.thresholds?.turbidity_ntu?.level_2_max ?? config?.thresholds?.turbidity_ntu?.medium_max ?? 25.0,
+    tds_level1_max: config?.thresholds?.tds_ppm?.level_1_max ?? config?.thresholds?.tds_ppm?.basic_max ?? 300,
+    tds_level2_max: config?.thresholds?.tds_ppm?.level_2_max ?? config?.thresholds?.tds_ppm?.medium_max ?? 800,
     ph_basic_min: config?.thresholds?.ph?.basic_min ?? 6.5,
     ph_basic_max: config?.thresholds?.ph?.basic_max ?? 8.5,
     poll_interval: pollingInterval / 1000
@@ -32,13 +32,17 @@ export default function ConfigModal({
         ...config.thresholds,
         turbidity_ntu: {
           optional: false,
-          basic_max: Number(form.turbidity_basic_max),
-          medium_max: Number(form.turbidity_medium_max)
+          level_1_max: Number(form.turbidity_level1_max),
+          level_2_max: Number(form.turbidity_level2_max),
+          basic_max: Number(form.turbidity_level1_max),
+          medium_max: Number(form.turbidity_level2_max)
         },
         tds_ppm: {
           optional: false,
-          basic_max: Number(form.tds_basic_max),
-          medium_max: Number(form.tds_medium_max)
+          level_1_max: Number(form.tds_level1_max),
+          level_2_max: Number(form.tds_level2_max),
+          basic_max: Number(form.tds_level1_max),
+          medium_max: Number(form.tds_level2_max)
         },
         ph: {
           optional: true,
@@ -56,13 +60,13 @@ export default function ConfigModal({
 
   const handleReset = () => {
     setForm({
-      version: '1.0.0-prototype',
-      turbidity_basic_max: DEFAULT_RULES_CONFIG.thresholds.turbidity_ntu.basic_max,
-      turbidity_medium_max: DEFAULT_RULES_CONFIG.thresholds.turbidity_ntu.medium_max,
-      tds_basic_max: DEFAULT_RULES_CONFIG.thresholds.tds_ppm.basic_max,
-      tds_medium_max: DEFAULT_RULES_CONFIG.thresholds.tds_ppm.medium_max,
-      ph_basic_min: DEFAULT_RULES_CONFIG.thresholds.ph.basic_min,
-      ph_basic_max: DEFAULT_RULES_CONFIG.thresholds.ph.basic_max,
+      version: '2.0.0-prototype',
+      turbidity_level1_max: 5.0,
+      turbidity_level2_max: 25.0,
+      tds_level1_max: 300,
+      tds_level2_max: 800,
+      ph_basic_min: 6.5,
+      ph_basic_max: 8.5,
       poll_interval: 3
     });
   };
@@ -78,11 +82,11 @@ export default function ConfigModal({
               <Sliders size={20} />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#f8fafc' }}>
-                Rules Engine Thresholds Configuration
+              <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#f8fafc', margin: 0 }}>
+                Assessment Rules Engine Configuration
               </h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Section 5.3: Configurable water quality classification limits
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                Configurable water quality classification thresholds
               </p>
             </div>
           </div>
@@ -94,156 +98,143 @@ export default function ConfigModal({
           </button>
         </div>
 
+        {/* Prototype Assessment Notice */}
+        <div style={{
+          padding: '10px 14px',
+          borderRadius: '8px',
+          background: 'rgba(245, 158, 11, 0.1)',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          marginBottom: '18px',
+          display: 'flex',
+          gap: '10px',
+          alignItems: 'center'
+        }}>
+          <AlertTriangle size={18} color="#fbbf24" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: '0.775rem', color: '#fde68a' }}>
+            <strong>Notice:</strong> These thresholds represent experimental prototype assessment criteria. They are configurable for laboratory calibration and do not certify drinking water standards.
+          </span>
+        </div>
+
         <form onSubmit={handleSubmit}>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
             
-            {/* Turbidity Config */}
-            <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-              <h4 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#38bdf8', marginBottom: '12px' }}>
-                Turbidity Thresholds (NTU)
-              </h4>
-              <div style={{ marginBottom: '10px' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  Basic Max Limit (NTU)
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={form.turbidity_basic_max}
-                  onChange={(e) => setForm({ ...form, turbidity_basic_max: e.target.value })}
-                  style={{ width: '100%', padding: '8px', background: '#090d16', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: '#f8fafc' }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  Medium Max Limit (NTU)
-                </label>
-                <input
-                  type="number"
-                  step="1.0"
-                  value={form.turbidity_medium_max}
-                  onChange={(e) => setForm({ ...form, turbidity_medium_max: e.target.value })}
-                  style={{ width: '100%', padding: '8px', background: '#090d16', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: '#f8fafc' }}
-                />
-              </div>
+            {/* Turbidity Level 1 Max */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', marginBottom: '6px', fontWeight: '600' }}>
+                Turbidity Level 1 Max (NTU)
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                min="0.5"
+                max="50"
+                value={form.turbidity_level1_max}
+                onChange={(e) => setForm({ ...form, turbidity_level1_max: e.target.value })}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid var(--border-subtle)', color: '#f8fafc' }}
+                required
+              />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>Default: 5.0 NTU (Satisfies Level 1)</span>
             </div>
 
-            {/* TDS Config */}
-            <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-              <h4 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#60a5fa', marginBottom: '12px' }}>
-                TDS Thresholds (ppm)
-              </h4>
-              <div style={{ marginBottom: '10px' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  Basic Max Limit (ppm)
-                </label>
-                <input
-                  type="number"
-                  value={form.tds_basic_max}
-                  onChange={(e) => setForm({ ...form, tds_basic_max: e.target.value })}
-                  style={{ width: '100%', padding: '8px', background: '#090d16', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: '#f8fafc' }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  Medium Max Limit (ppm)
-                </label>
-                <input
-                  type="number"
-                  value={form.tds_medium_max}
-                  onChange={(e) => setForm({ ...form, tds_medium_max: e.target.value })}
-                  style={{ width: '100%', padding: '8px', background: '#090d16', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: '#f8fafc' }}
-                />
-              </div>
+            {/* Turbidity Level 2 Max */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', marginBottom: '6px', fontWeight: '600' }}>
+                Turbidity Level 2 Max (NTU)
+              </label>
+              <input
+                type="number"
+                step="1"
+                min="5"
+                max="100"
+                value={form.turbidity_level2_max}
+                onChange={(e) => setForm({ ...form, turbidity_level2_max: e.target.value })}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid var(--border-subtle)', color: '#f8fafc' }}
+                required
+              />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>Default: 25.0 NTU (&gt;25 triggers Level 3)</span>
             </div>
 
-            {/* pH Config */}
-            <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-              <h4 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#c084fc', marginBottom: '12px' }}>
-                Optional pH Bounds
-              </h4>
-              <div style={{ marginBottom: '10px' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  Basic Min pH
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={form.ph_basic_min}
-                  onChange={(e) => setForm({ ...form, ph_basic_min: e.target.value })}
-                  style={{ width: '100%', padding: '8px', background: '#090d16', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: '#f8fafc' }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  Basic Max pH
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={form.ph_basic_max}
-                  onChange={(e) => setForm({ ...form, ph_basic_max: e.target.value })}
-                  style={{ width: '100%', padding: '8px', background: '#090d16', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: '#f8fafc' }}
-                />
-              </div>
+            {/* TDS Level 1 Max */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', marginBottom: '6px', fontWeight: '600' }}>
+                TDS Level 1 Max (ppm)
+              </label>
+              <input
+                type="number"
+                step="10"
+                min="50"
+                max="1000"
+                value={form.tds_level1_max}
+                onChange={(e) => setForm({ ...form, tds_level1_max: e.target.value })}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid var(--border-subtle)', color: '#f8fafc' }}
+                required
+              />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>Default: 300 ppm (Satisfies Level 1)</span>
             </div>
 
-            {/* Dashboard Polling Interval */}
-            <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-              <h4 style={{ fontSize: '0.875rem', fontWeight: '700', color: '#34d399', marginBottom: '12px' }}>
-                Dashboard Telemetry Polling
-              </h4>
-              <div style={{ marginBottom: '10px' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  Poll Interval (seconds)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={form.poll_interval}
-                  onChange={(e) => setForm({ ...form, poll_interval: e.target.value })}
-                  style={{ width: '100%', padding: '8px', background: '#090d16', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: '#f8fafc' }}
-                />
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>
-                Configures real-time polling cadence for hardware telemetry.
-              </div>
+            {/* TDS Level 2 Max */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', marginBottom: '6px', fontWeight: '600' }}>
+                TDS Level 2 Max (ppm)
+              </label>
+              <input
+                type="number"
+                step="50"
+                min="200"
+                max="3000"
+                value={form.tds_level2_max}
+                onChange={(e) => setForm({ ...form, tds_level2_max: e.target.value })}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid var(--border-subtle)', color: '#f8fafc' }}
+                required
+              />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>Default: 800 ppm (&gt;800 triggers Level 3)</span>
+            </div>
+
+            {/* Polling Interval */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', marginBottom: '6px', fontWeight: '600' }}>
+                Dashboard Polling Cadence (seconds)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="30"
+                value={form.poll_interval}
+                onChange={(e) => setForm({ ...form, poll_interval: e.target.value })}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid var(--border-subtle)', color: '#f8fafc' }}
+                required
+              />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>Default: 3 seconds (Matches ESP32 rate)</span>
             </div>
 
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
             <button
               type="button"
               className="btn btn-secondary"
               onClick={handleReset}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               <RotateCcw size={15} />
-              Reset to Defaults
+              <span>Reset Defaults</span>
             </button>
 
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={onClose}
-              >
+              <button type="button" className="btn btn-secondary" onClick={onClose}>
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-              >
+              <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Save size={15} />
-                Save & Apply Config
+                <span>Save & Apply</span>
               </button>
             </div>
           </div>
 
         </form>
+
       </div>
     </div>
   );

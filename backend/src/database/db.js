@@ -1,5 +1,6 @@
 /**
  * Database Layer for GreyWater Guardian
+ * IoT Greywater Quality Assessment & Recommendation System
  *
  * Supports MySQL connection pooling via mysql2.
  * Includes an integrated resilient in-memory fallback store if MySQL is
@@ -14,7 +15,7 @@ let isUsingFallback = false;
 // Resilient In-Memory store for demo mode & offline development
 const inMemoryStore = {
   devices: new Map([
-    ['GW-001', { device_id: 'GW-001', device_name: 'ESP32 Main Greywater Monitor', last_seen_at: new Date().toISOString() }]
+    ['GW-001', { device_id: 'GW-001', device_name: 'ESP32 Greywater Quality Monitor', last_seen_at: new Date().toISOString() }]
   ]),
   readings: [],
   events: []
@@ -43,7 +44,6 @@ export async function initDatabase() {
       connectTimeout: 2000
     });
 
-    // Test ping
     const conn = await pool.getConnection();
     await conn.ping();
     conn.release();
@@ -68,7 +68,7 @@ export function getDbMode() {
 /**
  * Register or update device
  */
-export async function upsertDevice(deviceId, deviceName = 'ESP32 Monitor') {
+export async function upsertDevice(deviceId, deviceName = 'ESP32 Greywater Monitor') {
   const now = new Date();
   if (isUsingFallback || !pool) {
     const existing = inMemoryStore.devices.get(deviceId) || { device_id: deviceId, created_at: now.toISOString() };
@@ -91,10 +91,11 @@ export async function upsertDevice(deviceId, deviceName = 'ESP32 Monitor') {
 }
 
 /**
- * Save new sensor reading
+ * Save new sensor reading & water quality assessment
  */
 export async function saveReading(reading) {
   const receivedAt = reading.received_at ? new Date(reading.received_at) : new Date();
+  const assignedClassification = reading.assessment?.treatment_level || reading.classification || 'UNKNOWN';
 
   if (isUsingFallback || !pool) {
     const record = {
@@ -102,28 +103,28 @@ export async function saveReading(reading) {
       device_id: reading.device_id,
       received_at: receivedAt.toISOString(),
       sequence: reading.sequence,
-      ph: reading.sensors.ph !== undefined ? reading.sensors.ph : null,
-      tds_ppm: reading.sensors.tds_ppm,
-      turbidity_ntu: reading.sensors.turbidity_ntu,
-      temperature_c: reading.sensors.temperature_c,
+      tds_ppm: reading.sensors?.tds_ppm ?? null,
+      turbidity_ntu: reading.sensors?.turbidity_ntu ?? null,
+      temperature_c: reading.sensors?.temperature_c ?? null,
+      ph: reading.sensors?.ph ?? null,
+      sensor_validity: reading.sensor_validity || {
+        tds_ppm: reading.sensors?.tds_ppm !== null && reading.sensors?.tds_ppm !== undefined,
+        turbidity_ntu: reading.sensors?.turbidity_ntu !== null && reading.sensors?.turbidity_ntu !== undefined,
+        temperature_c: reading.sensors?.temperature_c !== null && reading.sensors?.temperature_c !== undefined,
+        ph: reading.sensors?.ph !== null && reading.sensors?.ph !== undefined
+      },
+      assigned_classification: assignedClassification,
+      recommended_treatment_level: assignedClassification, // backwards compatibility
+      assessment_status: reading.assessment?.assessment_status || 'UNKNOWN',
+      recommendation_details: reading.assessment?.recommendation || null,
       device_status: reading.device_status || 'ONLINE',
       source_mode: reading.source_mode || 'HARDWARE',
-      assessment_status: reading.assessment?.assessment_status || 'UNKNOWN',
-      recommended_treatment_level: reading.assessment?.treatment_level || 'UNKNOWN',
-      active_stage: reading.treatment?.active_stage ?? null,
-      pump_status: reading.treatment?.pump_status || null,
-      stage_1: reading.treatment?.stage_1 || null,
-      stage_2: reading.treatment?.stage_2 || null,
-      stage_3: reading.treatment?.stage_3 || null,
-      output_sensors: reading.output_sensors || null,
       raw_payload: reading.raw_payload || reading
     };
     inMemoryStore.readings.push(record);
-    // Keep max 500 readings in memory
     if (inMemoryStore.readings.length > 500) {
       inMemoryStore.readings.shift();
     }
-    // Update device last seen
     upsertDevice(reading.device_id);
     return record;
   }
@@ -133,32 +134,34 @@ export async function saveReading(reading) {
 
     const query = `
       INSERT INTO sensor_readings (
-        device_id, received_at, sequence, ph, tds_ppm, turbidity_ntu, temperature_c,
-        device_status, source_mode, assessment_status, recommended_treatment_level,
-        active_stage, pump_status, output_ph, output_tds_ppm, output_turbidity_ntu,
-        output_temperature_c, raw_payload
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        device_id, received_at, sequence, tds_ppm, turbidity_ntu, temperature_c, ph,
+        sensor_validity, assigned_classification, recommended_treatment_level,
+        assessment_status, recommendation_details, device_status, source_mode, raw_payload
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    const out = reading.output_sensors || {};
+    const validity = reading.sensor_validity || {
+      tds_ppm: reading.sensors?.tds_ppm !== null && reading.sensors?.tds_ppm !== undefined,
+      turbidity_ntu: reading.sensors?.turbidity_ntu !== null && reading.sensors?.turbidity_ntu !== undefined,
+      temperature_c: reading.sensors?.temperature_c !== null && reading.sensors?.temperature_c !== undefined,
+      ph: reading.sensors?.ph !== null && reading.sensors?.ph !== undefined
+    };
+
     const values = [
       reading.device_id,
       receivedAt,
       reading.sequence,
-      reading.sensors.ph ?? null,
-      reading.sensors.tds_ppm,
-      reading.sensors.turbidity_ntu,
-      reading.sensors.temperature_c,
+      reading.sensors?.tds_ppm ?? null,
+      reading.sensors?.turbidity_ntu ?? null,
+      reading.sensors?.temperature_c ?? null,
+      reading.sensors?.ph ?? null,
+      JSON.stringify(validity),
+      assignedClassification,
+      assignedClassification,
+      reading.assessment?.assessment_status || 'UNKNOWN',
+      JSON.stringify(reading.assessment?.recommendation || null),
       reading.device_status || 'ONLINE',
       reading.source_mode || 'HARDWARE',
-      reading.assessment?.assessment_status || 'UNKNOWN',
-      reading.assessment?.treatment_level || 'UNKNOWN',
-      reading.treatment?.active_stage ?? null,
-      reading.treatment?.pump_status || null,
-      out.ph ?? null,
-      out.tds_ppm ?? null,
-      out.turbidity_ntu ?? null,
-      out.temperature_c ?? null,
       JSON.stringify(reading.raw_payload || reading)
     ];
 
@@ -199,24 +202,21 @@ export async function getLatestReading(deviceId) {
  * Fetch reading history for charts and analytics
  */
 export async function getReadingHistory(deviceId, limit = 100) {
-  const safeLimit = Math.min(Math.max(1, Number(limit) || 100), 500);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 50), 500);
 
   if (isUsingFallback || !pool) {
-    const list = inMemoryStore.readings
-      .filter((r) => r.device_id === deviceId)
-      .slice(-safeLimit)
-      .reverse();
-    return list;
+    const list = inMemoryStore.readings.filter((r) => r.device_id === deviceId);
+    return list.slice(-safeLimit).reverse();
   }
 
   try {
     const query = `
       SELECT * FROM sensor_readings
       WHERE device_id = ?
-      ORDER BY received_at DESC
+      ORDER BY received_at DESC, id DESC
       LIMIT ?
     `;
-    const [rows] = await pool.query(query, [deviceId, safeLimit]);
+    const [rows] = await pool.execute(query, [deviceId, safeLimit]);
     return rows;
   } catch (err) {
     console.error('[DB] getReadingHistory error:', err.message);
@@ -225,73 +225,25 @@ export async function getReadingHistory(deviceId, limit = 100) {
 }
 
 /**
- * Fetch device status and connectivity info
- */
-export async function getDeviceStatus(deviceId, staleTimeoutSeconds = 30) {
-  let device = null;
-  let latest = null;
-
-  if (isUsingFallback || !pool) {
-    device = inMemoryStore.devices.get(deviceId) || { device_id: deviceId, device_name: 'ESP32 Monitor' };
-    const list = inMemoryStore.readings.filter((r) => r.device_id === deviceId);
-    latest = list.length > 0 ? list[list.length - 1] : null;
-  } else {
-    try {
-      const [devRows] = await pool.execute('SELECT * FROM devices WHERE device_id = ?', [deviceId]);
-      device = devRows[0] || null;
-      latest = await getLatestReading(deviceId);
-    } catch (err) {
-      console.error('[DB] getDeviceStatus error:', err.message);
-    }
-  }
-
-  const now = Date.now();
-  let connectivity = 'UNKNOWN';
-  let secondsSinceLastReading = null;
-
-  if (latest && latest.received_at) {
-    const lastTime = new Date(latest.received_at).getTime();
-    secondsSinceLastReading = Math.max(0, Math.floor((now - lastTime) / 1000));
-
-    if (latest.device_status === 'OFFLINE' || latest.device_status === 'ERROR') {
-      connectivity = latest.device_status;
-    } else if (secondsSinceLastReading > staleTimeoutSeconds) {
-      connectivity = 'STALE_DATA';
-    } else {
-      connectivity = 'ONLINE';
-    }
-  } else {
-    connectivity = 'OFFLINE';
-  }
-
-  return {
-    device_id: deviceId,
-    device_name: device?.device_name || 'ESP32 Greywater Guardian',
-    connectivity,
-    seconds_since_last_reading: secondsSinceLastReading,
-    last_seen_at: latest?.received_at || device?.last_seen_at || null,
-    source_mode: latest?.source_mode || 'SIMULATED',
-    latest_reading: latest
-  };
-}
-
-/**
- * Log System Event
+ * Log a system event
  */
 export async function logEvent(deviceId, eventType, message, severity = 'INFO') {
-  const createdAt = new Date();
+  const now = new Date();
+  const event = {
+    id: inMemoryStore.events.length + 1,
+    device_id: deviceId,
+    event_type: eventType,
+    message,
+    severity,
+    created_at: now.toISOString()
+  };
+
   if (isUsingFallback || !pool) {
-    const item = {
-      id: inMemoryStore.events.length + 1,
-      device_id: deviceId,
-      event_type: eventType,
-      message,
-      severity,
-      created_at: createdAt.toISOString()
-    };
-    inMemoryStore.events.push(item);
-    if (inMemoryStore.events.length > 300) inMemoryStore.events.shift();
-    return item;
+    inMemoryStore.events.push(event);
+    if (inMemoryStore.events.length > 200) {
+      inMemoryStore.events.shift();
+    }
+    return event;
   }
 
   try {
@@ -299,35 +251,69 @@ export async function logEvent(deviceId, eventType, message, severity = 'INFO') 
       INSERT INTO system_events (device_id, event_type, message, severity, created_at)
       VALUES (?, ?, ?, ?, ?)
     `;
-    const [result] = await pool.execute(query, [deviceId, eventType, message, severity, createdAt]);
-    return { id: result.insertId, device_id: deviceId, event_type: eventType, message, severity, created_at: createdAt.toISOString() };
+    const [res] = await pool.execute(query, [deviceId, eventType, message, severity, now]);
+    return { ...event, id: res.insertId };
   } catch (err) {
     console.error('[DB] logEvent error:', err.message);
+    return event;
   }
 }
 
 /**
- * Get recent system events
+ * Fetch recent system events
  */
 export async function getSystemEvents(deviceId, limit = 50) {
-  const safeLimit = Math.min(Math.max(1, Number(limit) || 50), 200);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 50), 100);
 
   if (isUsingFallback || !pool) {
-    return inMemoryStore.events
-      .filter((e) => !deviceId || e.device_id === deviceId)
-      .slice(-safeLimit)
-      .reverse();
+    const evs = inMemoryStore.events.filter((e) => e.device_id === deviceId);
+    return evs.slice(-safeLimit).reverse();
   }
 
   try {
-    const query = deviceId
-      ? `SELECT * FROM system_events WHERE device_id = ? ORDER BY created_at DESC LIMIT ?`
-      : `SELECT * FROM system_events ORDER BY created_at DESC LIMIT ?`;
-    const params = deviceId ? [deviceId, safeLimit] : [safeLimit];
-    const [rows] = await pool.query(query, params);
+    const query = `
+      SELECT * FROM system_events
+      WHERE device_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?
+    `;
+    const [rows] = await pool.execute(query, [deviceId, safeLimit]);
     return rows;
   } catch (err) {
     console.error('[DB] getSystemEvents error:', err.message);
     throw err;
   }
+}
+
+/**
+ * Check device connectivity and freshness
+ */
+export async function getDeviceStatus(deviceId, staleThresholdSeconds = 30) {
+  const latest = await getLatestReading(deviceId);
+  if (!latest) {
+    return {
+      device_id: deviceId,
+      status: 'NEVER_CONNECTED',
+      is_online: false,
+      is_stale: false,
+      last_seen: null,
+      age_seconds: null
+    };
+  }
+
+  const lastSeenDate = new Date(latest.received_at);
+  const now = new Date();
+  const ageSeconds = Math.max(0, Math.floor((now.getTime() - lastSeenDate.getTime()) / 1000));
+  const isOnline = latest.device_status === 'ONLINE' && ageSeconds <= staleThresholdSeconds;
+  const isStale = ageSeconds > staleThresholdSeconds && latest.source_mode === 'HARDWARE';
+
+  return {
+    device_id: deviceId,
+    status: isOnline ? 'ONLINE' : (isStale ? 'STALE' : 'OFFLINE'),
+    is_online: isOnline,
+    is_stale: isStale,
+    last_seen: latest.received_at,
+    age_seconds: ageSeconds,
+    latest_reading: latest
+  };
 }

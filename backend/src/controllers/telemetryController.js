@@ -1,5 +1,6 @@
 /**
  * Telemetry and Device API Controller for GreyWater Guardian
+ * IoT Greywater Quality Assessment & Recommendation System
  */
 
 import { validateTelemetryPayload } from '../validation/telemetryValidation.js';
@@ -17,7 +18,7 @@ export function getActiveRulesConfig() {
 }
 
 export function setActiveRulesConfig(newConfig) {
-  activeRulesConfig = { ...DEFAULT_RULES_CONFIG, ...newConfig, version: newConfig.version || '1.1.0-custom' };
+  activeRulesConfig = { ...DEFAULT_RULES_CONFIG, ...newConfig, version: newConfig.version || '2.1.0-custom' };
   return activeRulesConfig;
 }
 
@@ -62,7 +63,7 @@ export async function postTelemetry(req, res) {
     }
     lastSequences.set(deviceId, data.sequence);
 
-    // 3. Assess Water Quality via Rules Engine
+    // 3. Assess Water Quality & Generate Recommendations
     const isStale = data.is_stale_simulation || false;
     const isOffline = data.device_status === 'OFFLINE' || data.is_offline_simulation;
     const assessment = assessWaterQuality(data.sensors, activeRulesConfig, {
@@ -70,21 +71,7 @@ export async function postTelemetry(req, res) {
       is_offline: isOffline
     });
 
-    // 4. Check for treatment stage mismatch if hardware reported its active stage
-    if (data.treatment && data.treatment.active_stage !== null && assessment.treatment_level !== 'UNKNOWN') {
-      const stageMap = { BASIC: 1, MEDIUM: 2, HIGH: 3 };
-      const recommendedStageNum = stageMap[assessment.treatment_level];
-      if (recommendedStageNum && data.treatment.active_stage !== recommendedStageNum) {
-        await db.logEvent(
-          deviceId,
-          'STAGE_MISMATCH',
-          `Controller active stage (${data.treatment.active_stage}) does not match recommended stage (${recommendedStageNum}) for ${assessment.treatment_level} treatment`,
-          'WARNING'
-        );
-      }
-    }
-
-    // 5. Persist to Database / Memory store
+    // 4. Persist to Database / Memory store
     const recordToSave = {
       device_id: deviceId,
       sequence: data.sequence,
@@ -93,10 +80,10 @@ export async function postTelemetry(req, res) {
         ? new Date(Date.now() - (rawPayload.stale_offset_seconds || 60) * 1000).toISOString()
         : receivedAt.toISOString(),
       sensors: data.sensors,
-      output_sensors: data.output_sensors,
+      sensor_validity: data.sensor_validity,
       device_status: data.device_status,
       source_mode: data.source_mode,
-      treatment: data.treatment,
+      classification: data.classification || assessment.treatment_level,
       assessment,
       raw_payload: rawPayload
     };
@@ -105,7 +92,7 @@ export async function postTelemetry(req, res) {
 
     return res.status(201).json({
       status: 'SUCCESS',
-      message: 'Telemetry processed and persisted',
+      message: 'Telemetry evaluated and saved',
       received_at: recordToSave.received_at,
       device_id: deviceId,
       sequence: data.sequence,
@@ -113,11 +100,14 @@ export async function postTelemetry(req, res) {
       source_mode: data.source_mode,
       assessment: {
         treatment_level: assessment.treatment_level,
+        legacy_treatment_level: assessment.legacy_treatment_level,
         assessment_status: assessment.assessment_status,
         explanation: assessment.explanation,
-        stage_mapping: assessment.stage_mapping,
+        reasons: assessment.reasons,
         parameters_considered: assessment.parameters_considered,
-        parameters_outside_criteria: assessment.parameters_outside_criteria
+        parameters_outside_criteria: assessment.parameters_outside_criteria,
+        recommendation: assessment.recommendation,
+        stage_mapping: assessment.stage_mapping
       },
       reading_id: saved.id
     });
@@ -146,7 +136,6 @@ export async function getLatest(req, res) {
       });
     }
 
-    // Re-evaluate assessment with current rules config in case thresholds changed
     const sensors = {
       ph: reading.ph,
       tds_ppm: reading.tds_ppm,
@@ -168,12 +157,6 @@ export async function getLatest(req, res) {
       data: {
         ...reading,
         sensors,
-        output_sensors: reading.output_tds_ppm !== null && reading.output_tds_ppm !== undefined ? {
-          ph: reading.output_ph,
-          tds_ppm: reading.output_tds_ppm,
-          turbidity_ntu: reading.output_turbidity_ntu,
-          temperature_c: reading.output_temperature_c
-        } : (reading.output_sensors || null),
         reading_age_seconds: readingAgeSeconds,
         is_stale: isStale,
         assessment
