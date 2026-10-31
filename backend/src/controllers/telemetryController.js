@@ -71,7 +71,19 @@ export async function postTelemetry(req, res) {
       is_offline: isOffline
     });
 
-    // 4. Persist to Database / Memory store
+    // 4. Backend-Authoritative Classification Check
+    // The backend analysis engine is authoritative over preliminary ESP32 local estimates
+    const authoritativeLevel = assessment.treatment_level;
+    if (data.classification && data.classification !== authoritativeLevel && authoritativeLevel !== 'UNKNOWN') {
+      await db.logEvent(
+        deviceId,
+        'CLASSIFICATION_OVERRIDE',
+        `Backend rules evaluated ${authoritativeLevel} (ESP32 local estimate was ${data.classification})`,
+        'INFO'
+      );
+    }
+
+    // 5. Persist to Database / Memory store
     const recordToSave = {
       device_id: deviceId,
       sequence: data.sequence,
@@ -83,7 +95,8 @@ export async function postTelemetry(req, res) {
       sensor_validity: data.sensor_validity,
       device_status: data.device_status,
       source_mode: data.source_mode,
-      classification: data.classification || assessment.treatment_level,
+      classification: authoritativeLevel, // Backend-authoritative classification
+      raw_esp32_classification: data.classification || null,
       assessment,
       raw_payload: rawPayload
     };

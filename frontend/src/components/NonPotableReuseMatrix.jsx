@@ -54,19 +54,36 @@ export default function NonPotableReuseMatrix({ treatmentLevel, assessmentStatus
 
   return (
     <div className="glass-panel" style={{ padding: '24px', marginBottom: '20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
         <div>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
             <Droplet size={20} color="#10b981" />
-            Approved Non-Potable Water Reuse Guidance
+            Informational Non-Potable Water Reuse Suggestions
           </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Permissible non-potable reuse utilization matrix matched against current water quality assessment
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+            Educational reuse reference matrix matched to assessed physical parameters
           </p>
         </div>
 
         <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#94a3b8', fontSize: '0.75rem' }}>
-          Non-Potable Regulatory Reference Matrix
+          Educational Guidance Only
+        </span>
+      </div>
+
+      {/* Informational Disclaimer Banner */}
+      <div style={{
+        padding: '10px 14px',
+        borderRadius: '8px',
+        background: 'rgba(56, 189, 248, 0.08)',
+        border: '1px solid rgba(56, 189, 248, 0.25)',
+        marginBottom: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
+      }}>
+        <AlertTriangle size={18} color="#38bdf8" style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: '0.775rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+          <strong>Informational Guidance:</strong> The applications below are general educational suggestions based on physical turbidity and dissolved solids. This system does <strong>not</strong> grant regulatory safety approval, potability certification, or sanitation compliance. All reuse must strictly adhere to local environmental and health guidelines.
         </span>
       </div>
 
@@ -118,7 +135,7 @@ export default function NonPotableReuseMatrix({ treatmentLevel, assessmentStatus
                   fontWeight: '700',
                   color: app.isStrictlyProhibited ? '#f87171' : app.isAllowed ? '#34d399' : '#94a3b8'
                 }}>
-                  {app.isStrictlyProhibited ? 'PROHIBITED' : app.isAllowed ? 'SUITABLE' : 'RESTRICTED'}
+                  {app.isStrictlyProhibited ? 'PROHIBITED' : app.isAllowed ? 'SUGGESTED USE' : 'RESTRICTED'}
                 </span>
               </div>
 

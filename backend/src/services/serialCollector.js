@@ -123,11 +123,21 @@ async function processTelemetryRecord(record) {
   }
   processedSequences.set(deviceId, sequence);
 
-  // Assess Water Quality using the rules engine
+  // Assess Water Quality using the backend-authoritative rules engine
   const assessment = assessWaterQuality(data.sensors, null, {
     is_offline: false,
     is_stale: false
   });
+
+  const authoritativeLevel = assessment.treatment_level;
+  if (data.classification && data.classification !== authoritativeLevel && authoritativeLevel !== 'UNKNOWN') {
+    await db.logEvent(
+      deviceId,
+      'CLASSIFICATION_OVERRIDE',
+      `Backend rules evaluated ${authoritativeLevel} (ESP32 preliminary was ${data.classification})`,
+      'INFO'
+    );
+  }
 
   const recordToSave = {
     device_id: deviceId,
@@ -138,7 +148,8 @@ async function processTelemetryRecord(record) {
     sensor_validity: data.sensor_validity,
     device_status: data.device_status || 'ONLINE',
     source_mode: 'HARDWARE',
-    classification: data.classification || assessment.treatment_level,
+    classification: authoritativeLevel, // Backend-authoritative classification
+    raw_esp32_classification: data.classification || null,
     assessment,
     raw_payload: record
   };
@@ -274,19 +285,19 @@ function scheduleReconnect() {
 export async function startSerialCollector(options = {}) {
   isStopping = false;
 
-  const baudRate = Number(options.baud || process.env.SERIAL_BAUD || 115200);
+  let baudRate = Number(options.baud || process.env.SERIAL_BAUD || 115200);
 
   // 1. Specified port from options, CLI args, or env var
   let targetPort = options.port || process.env.SERIAL_PORT || process.env.ESP32_PORT;
 
-  // Parse command line arguments if run directly (e.g., node serialCollector.js --port COM7)
+  // Parse command line arguments if run directly (e.g., node serialCollector.js --port COM7 --baud 115200)
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--port' && args[i + 1]) {
       targetPort = args[i + 1];
     }
     if (args[i] === '--baud' && args[i + 1]) {
-      targetPort = Number(args[i + 1]);
+      baudRate = Number(args[i + 1]);
     }
   }
 

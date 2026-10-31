@@ -27,9 +27,14 @@ export default function LiveSensorCards({ sensors, assessment, isStale }) {
             <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(6, 182, 212, 0.15)', color: '#38bdf8' }}>
               <Waves size={18} />
             </div>
-            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-              TURBIDITY
-            </span>
+            <div>
+              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', display: 'block' }}>
+                TURBIDITY
+              </span>
+              <span style={{ fontSize: '0.675rem', color: '#fbbf24', fontWeight: '600' }}>
+                PROTOTYPE ESTIMATE (REQUIRES CALIBRATION)
+              </span>
+            </div>
           </div>
           <span className={`badge ${
             turb === null || turb === undefined ? 'badge-error' :
@@ -74,9 +79,14 @@ export default function LiveSensorCards({ sensors, assessment, isStale }) {
             <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa' }}>
               <Zap size={18} />
             </div>
-            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-              TDS (SOLIDS)
-            </span>
+            <div>
+              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', display: 'block' }}>
+                TDS (SOLIDS)
+              </span>
+              <span style={{ fontSize: '0.675rem', color: '#fbbf24', fontWeight: '600' }}>
+                PROTOTYPE ESTIMATE (REQUIRES CALIBRATION)
+              </span>
+            </div>
           </div>
           <span className={`badge ${
             tds === null || tds === undefined ? 'badge-error' :
@@ -123,9 +133,14 @@ export default function LiveSensorCards({ sensors, assessment, isStale }) {
             <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>
               <Thermometer size={18} />
             </div>
-            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-              TEMPERATURE
-            </span>
+            <div>
+              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', display: 'block' }}>
+                TEMPERATURE
+              </span>
+              <span style={{ fontSize: '0.675rem', color: '#38bdf8', fontWeight: '600' }}>
+                CONTEXTUAL METRIC (DS18B20)
+              </span>
+            </div>
           </div>
           <span className="badge" style={{
             background: temp === null || temp === undefined ? 'rgba(239, 68, 68, 0.18)' : 'rgba(16, 185, 129, 0.15)',

@@ -162,3 +162,4 @@ export default function TreatmentRecommendationGuide({ assessment }) {
     </div>
   );
 }
+

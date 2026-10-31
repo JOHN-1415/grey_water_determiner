@@ -22,3 +22,4 @@ WHERE assigned_classification = 'UNKNOWN' AND recommended_treatment_level IS NOT
 -- 3. Add index on assigned_classification for fast querying
 ALTER TABLE sensor_readings
 ADD INDEX IF NOT EXISTS idx_classification (assigned_classification);
+
